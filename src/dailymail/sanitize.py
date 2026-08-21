@@ -330,8 +330,71 @@ def clean(html: str) -> str:
     return _nh3(html, schemes=ALLOWED_URL_SCHEMES)
 
 
+# --- density pass ------------------------------------------------------------
+
+# Editors leave behind paragraphs holding nothing but a non-breaking space or a
+# stray <br>. In an email they read as dead vertical space, so they go.
+_EMPTY_BLOCK = re.compile(
+    r"<(p|div)\b[^>]*>(?:\s|&nbsp;|&#160;|&#xa0;|<br\s*/?>)*</\1>",
+    re.IGNORECASE,
+)
+
+# Classic Outlook ignores <style>, so it would apply its own ~1em paragraph
+# margins and the digest would render far looser than designed. Inline a tight
+# default on any block that does not already carry a margin.
+_DEFAULT_MARGINS = {
+    "p": "margin:0 0 9px 0",
+    "h1": "margin:12px 0 6px 0",
+    "h2": "margin:12px 0 6px 0",
+    "h3": "margin:12px 0 6px 0",
+    "h4": "margin:12px 0 6px 0",
+    "h5": "margin:10px 0 5px 0",
+    "h6": "margin:10px 0 5px 0",
+    "ul": "margin:0 0 9px 0;padding-left:22px",
+    "ol": "margin:0 0 9px 0;padding-left:22px",
+    "li": "margin:0 0 3px 0",
+    "blockquote": "margin:0 0 9px 12px",
+    "table": "margin:0 0 9px 0",
+}
+_OPEN_TAG = re.compile(r"<([a-zA-Z][a-zA-Z0-9]*)((?:\s[^>]*)?)>")
+
+
+def _inline_default_margins(html: str) -> str:
+    def replace(match: re.Match) -> str:
+        tag = match.group(1).lower()
+        attrs = match.group(2) or ""
+        default = _DEFAULT_MARGINS.get(tag)
+        if not default:
+            return match.group(0)
+        style_match = re.search(r'style\s*=\s*"([^"]*)"', attrs, re.IGNORECASE)
+        if style_match:
+            existing = style_match.group(1)
+            if "margin" in existing.lower():
+                return match.group(0)
+            merged = f"{default};{existing}" if existing.strip() else default
+            attrs = (
+                attrs[: style_match.start(1)] + merged + attrs[style_match.end(1) :]
+            )
+            return f"<{tag}{attrs}>"
+        return f'<{tag}{attrs} style="{default}">'
+
+    return _OPEN_TAG.sub(replace, html)
+
+
+def tighten(html: str) -> str:
+    """Cosmetic density pass. Runs after sanitization, so it only ever sees
+    already-safe markup and cannot reintroduce anything unsafe."""
+    previous = None
+    current = html or ""
+    # Nested empties (<div><p>&nbsp;</p></div>) need more than one sweep.
+    while previous != current:
+        previous = current
+        current = _EMPTY_BLOCK.sub("", current)
+    return _inline_default_margins(current)
+
+
 def sanitize_body(html: str, *, image_resolver=None) -> tuple[str, LinkStats, int]:
     """Full pipeline. Returns (safe_html, link_stats, images_seen)."""
     prefiltered = prefilter(html)
     rewritten, stats, images = transform(prefiltered, image_resolver=image_resolver)
-    return clean(rewritten), stats, images
+    return tighten(clean(rewritten)), stats, images

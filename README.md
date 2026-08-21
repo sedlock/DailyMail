@@ -1,79 +1,111 @@
 # DailyMail
 
-A deterministic collector for [Rowan Announcer](https://apps.rowan.edu/RowanAnnouncer/)
-announcements. Eventually this will produce one information-dense daily digest
-email; right now it collects and validates the data that digest will be built from.
+A curated daily digest of [Rowan Announcer](https://apps.rowan.edu/RowanAnnouncer/)
+announcements, delivered as one information-dense, Outlook-compatible email.
 
-## Status
+**Status: in production.** A systemd user timer runs the pipeline every day at
+07:00 America/New_York.
 
-| Phase | Scope | State |
-|---|---|---|
-| 0 | Reconnaissance of the live application | complete — `docs/site-reconnaissance.md` |
-| 1 | Validated read-only collector, normalized daily dataset | complete — `docs/collector-architecture.md` |
-| 2+ | SQLite history, change detection, Claude curation, Outlook email, scheduling | not started |
+## What it does
+
+Every morning DailyMail collects every announcement valid for that date from both
+the Employee and Student views, validates completeness against the source's own
+counts, records history in SQLite, works out what is new and what has
+substantively changed, asks Claude to rank the day, renders one email containing
+the **complete** text of every announcement, and sends it.
+
+The email is the product: no navigation, no clicking through, no summaries. Each
+announcement appears once, in full, with its event details, contact/submitter/
+approver metadata, and a direct link to the official Rowan page for verification.
 
 ## Quick start
 
 ```sh
 uv sync
+uv run pytest                      # 399 tests, no network required
 
-uv run dailymail collect                      # today, in America/New_York
-uv run dailymail collect --date 2026-08-20    # a specific date
-uv run dailymail inspect --date 2026-08-20    # summarize what was collected
-
-uv run pytest                                 # 157 tests, no network required
+uv run dailymail run-daily         # the full pipeline for today
+uv run dailymail status            # runs, deliveries, timer state
+uv run dailymail db-status         # database and category state
 ```
 
-Successful output:
+Preview without sending:
+
+```sh
+uv run dailymail run-daily --dry-run
+uv run dailymail render --date 2026-08-21 --inline-images --out /tmp/preview
+```
+
+Operational reference — commands, exit codes, failure behaviour, troubleshooting:
+**`docs/operations.md`**.
+
+## How it works
 
 ```
-COLLECT OK date=2026-08-20 employees=13 students=3 unique=13 new=5 standing=8 categories=33
+07:00 ET  systemd timer
+          -> collect      two JSON requests to Rowan's OutSystems screen service
+          -> validate     nine gates; a failure means no digest, not a bad digest
+          -> persist      SQLite history, versioned only on real content change
+          -> curate       Claude ranks; deterministic fallback if anything fails
+          -> render       deterministic HTML + plain text from stored state
+          -> send         Gmail STARTTLS, idempotent per date
 ```
 
-Collections are written to `$XDG_STATE_HOME/dailymail/collections/YYYY-MM-DD.json`
-(default `~/.local/state/dailymail/collections/`) — outside the repository, and
-never committed.
+Six things are worth knowing:
 
-## How it works, briefly
-
-Rowan Announcer is an OutSystems React single-page app: the served HTML contains
-no announcement data, and its UI renders only the first 20 announcements behind a
-"Load More" button. So the collector talks to the app's own JSON screen service,
-`ActionGetHomeData`, which returns complete bodies and metadata plus an explicit
-`TotalCount` — two requests per day, one per audience, no browser.
-
-Three things are worth knowing up front:
-
-* **A stale `apiVersion` returns HTTP 200 with an empty payload.** That looks
-  exactly like a quiet news day. The collector checks `hasApiVersionChanged` on
-  every response, rediscovers its tokens and retries once, then fails loudly. It
-  never reports that condition as "no announcements".
-* **`apps.rowan.edu` serves an incomplete certificate chain.** It omits the
-  InCommon intermediate. That intermediate is vendored and added to the public
-  roots; verification is never disabled.
-* **The API over-exposes PII** (Banner IDs, usernames, `Last_Login`, a `Password`
-  key). The data model is an allowlist, and the drop policy is enforced at
-  runtime before anything is written.
-
-Full detail in `docs/collector-architecture.md`.
+* **The collector is deterministic and Claude is not in it.** Announcement data
+  comes from the app's own JSON endpoint, not from browser scraping — Rowan's UI
+  renders only the first 20 announcements behind a "Load More" button, so a DOM
+  scraper silently loses data. Claude only ever decides *ordering*.
+* **A stale API version returns HTTP 200 with an empty payload**, which looks
+  exactly like a quiet news day. The collector detects it, rediscovers its
+  tokens, retries once, then fails loudly. It never reports that as "no news".
+* **New vs Standing comes from Rowan's own data** (`min(DistributionDates) ==
+  today`), validated 13/13 against a real Rowan digest — not from when DailyMail
+  happened to first see an announcement.
+* **Curation output is accepted only as a permutation.** Reclassifying, dropping,
+  inventing or duplicating an announcement is rejected, so announcement text that
+  tries to instruct the model cannot change what gets delivered.
+* **A Claude problem never costs you the email.** It falls back to a transparent
+  deterministic ranking and delivers the complete digest anyway.
+* **Inline images are real.** Rowan bodies embed `data:` URIs over 6 MB. Those are
+  decoded, verified, downscaled and re-attached as CID parts within a byte budget;
+  anything undecodable becomes a link to the source instead of a broken image.
 
 ## Repository layout
 
 ```
-src/dailymail/            the collector
-  certs/                  vendored InCommon intermediate + provenance
+src/dailymail/
+  collect.py client.py discovery.py validate.py normalize.py tls.py   Phase 1 collector
+  db.py ingest.py                                                     history + versioning
+  curate.py                                                           Claude ranking + fallback
+  sanitize.py images.py render.py templates/                          the email
+  mailer.py                                                           MIME + SMTP
+  daily.py maintenance.py systemd_units.py cli.py                     orchestration + ops
 docs/
-  site-reconnaissance.md    Phase 0 report
-  site-reconnaissance.json  Phase 0 machine-readable findings
-  collector-architecture.md Phase 1 design
-artifacts/reconnaissance/ sanitized fixtures used by the test suite
-tools/recon/              Phase 0 probes, kept for manual diagnostics only
-tests/                    157 tests, fixture- and mock-driven
+  site-reconnaissance.md    Phase 0: how the source was reverse-engineered
+  collector-architecture.md Phase 1: the collector and its validation gates
+  operations.md             Phase 2: running it
+artifacts/reconnaissance/   sanitized fixtures the test suite runs against
+tools/recon/                Phase 0 probes, manual diagnostics only
+tests/                      399 tests, fixture- and mock-driven
 ```
+
+## Configuration
+
+`~/.config/dailymail/config.toml` — recipient, timezone, send time, Claude model,
+image budgets, retention, and the category priority order (first five locked).
+
+`~/.config/dailymail/credentials.env` (mode 0600) — `GMAIL_SMTP_USER` and
+`GMAIL_APP_PASSWORD`. Read only inside the sending process; never logged, never
+in a systemd unit, never sent to Claude, never committed.
 
 ## Scope discipline
 
-This project touches a live university system. The collector is read-only by
-construction: it can build exactly one request shape, never fetches announcement
-detail pages (which would trigger Rowan's own visitor-log write), and never calls
-any of the write endpoints catalogued in `docs/site-reconnaissance.md` §4.3.
+This touches a live university system and stays read-only by construction: one
+request shape, no announcement detail pages (which would trigger Rowan's own
+visitor-log write), and none of the write endpoints catalogued in
+`docs/site-reconnaissance.md` §4.3.
+
+Dependencies are deliberately few: `httpx`, `certifi`, `jinja2`, `pillow`, `nh3`.
+No ORM, no migration framework, no containers, no web server, no queue.

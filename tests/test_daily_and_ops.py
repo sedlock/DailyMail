@@ -561,3 +561,18 @@ def test_build_plan_honours_configured_send_time(tmp_path):
         credentials_path=Path("/y"), directory=tmp_path,
     )
     assert "OnCalendar=*-*-* 06:05:00 America/New_York" in plan.timer_text
+
+
+def test_working_directory_prefers_the_home_path(plan):
+    """The repo is reachable via a mount alias; units should say the home path."""
+    line = next(
+        line for line in plan.service_text.splitlines()
+        if line.startswith("WorkingDirectory=")
+    )
+    assert line == "WorkingDirectory=/home/sedlock/src/DailyMail"
+
+
+def test_canonical_project_dir_passes_through_unknown_paths(tmp_path):
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+    assert systemd_units.canonical_project_dir(other) == other.resolve()

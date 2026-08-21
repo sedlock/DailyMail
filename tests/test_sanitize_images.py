@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+import re
 
 import pytest
 from PIL import Image
@@ -57,9 +58,11 @@ def test_safe_formatting_preserved():
         "<sup>1</sup><br>"
     )
     out, _, _ = sanitize_body(html)
-    for tag in ("<p>", "<h3>", "<ul>", "<li>", "<ol>", "<strong>", "<em>",
-                "<u>", "<blockquote>", "<hr>", "<table>", "<td>", "<sup>", "<br>"):
-        assert tag in out, tag
+    # Block tags carry an inlined default margin after the density pass, so
+    # match on the tag name rather than an exact "<p>".
+    for tag in ("p", "h3", "ul", "li", "ol", "strong", "em", "u",
+                "blockquote", "hr", "table", "td", "sup", "br"):
+        assert re.search(rf"<{tag}[\s>]", out), tag
     for text in ("Para", "Heading", "one", "two", "first", "bold", "quote", "cell"):
         assert text in out
 
@@ -389,3 +392,53 @@ def test_real_phase_zero_image_compresses(image_settings, employee_fixture):
         image = processor.images[0]
         assert image.final_bytes < image.original_bytes / 4
         assert image.width <= image_settings.image_max_width_px
+
+
+# --- density pass ------------------------------------------------------------
+
+
+def test_empty_paragraphs_removed():
+    """CKEditor leaves &nbsp;-only paragraphs; they are dead vertical space."""
+    out, _, _ = sanitize_body(
+        "<p>real</p><p>&nbsp;</p><p><br>&nbsp;</p><p>more</p><div>  </div>"
+    )
+    assert "real" in out and "more" in out
+    assert not re.search(r"<p[^>]*>(?:\s|&nbsp;|<br\s*/?>)*</p>", out)
+
+
+def test_nested_empty_blocks_removed():
+    out, _, _ = sanitize_body("<div><p>&nbsp;</p></div><p>kept</p>")
+    assert "kept" in out
+    assert "&nbsp;" not in out
+
+
+def test_paragraphs_get_inline_margins_for_outlook():
+    """Classic Outlook ignores <style>, so spacing must be inline."""
+    out, _, _ = sanitize_body("<p>one</p><h3>head</h3><ul><li>item</li></ul>")
+    for match in re.finditer(r"<p([^>]*)>", out):
+        assert "margin" in match.group(1)
+    assert re.search(r"<h3[^>]*margin", out)
+    assert re.search(r"<ul[^>]*margin", out)
+    assert re.search(r"<li[^>]*margin", out)
+
+
+def test_author_margins_are_not_overridden():
+    out, _, _ = sanitize_body('<p style="margin-left:40px">indented</p>')
+    assert "margin-left:40px" in out
+    assert "margin:0 0 9px 0" not in out
+
+
+def test_author_styles_preserved_alongside_injected_margin():
+    out, _, _ = sanitize_body('<p style="color:red">tinted</p>')
+    assert "color:red" in out
+    assert "margin:0 0 9px 0" in out
+
+
+def test_density_pass_cannot_reintroduce_unsafe_content():
+    hostile = (
+        '<p>ok</p><script>alert(1)</script><p>&nbsp;</p>'
+        '<a href="javascript:x">b</a><iframe src=x></iframe>'
+    )
+    out, _, _ = sanitize_body(hostile)
+    for banned in ("script", "alert", "javascript:", "<iframe"):
+        assert banned not in out

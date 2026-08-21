@@ -79,6 +79,29 @@ class UnitPlan:
     timer_text: str
 
 
+def canonical_project_dir(start: Path) -> Path:
+    """Prefer a $HOME-based path over a bind-mount alias for the same directory.
+
+    The repository is reachable both as ~/src/DailyMail and via a mount alias.
+    Both are the same inode, but the home path is the one the operator uses and
+    the one referenced in documentation, so units should say that.
+    """
+    start = start.resolve()
+    try:
+        target = start.stat()
+    except OSError:
+        return start
+    for candidate in (Path.home() / "src" / start.name, Path.home() / start.name):
+        try:
+            if candidate.stat().st_ino == target.st_ino and (
+                candidate.stat().st_dev == target.st_dev
+            ):
+                return candidate
+        except OSError:
+            continue
+    return start
+
+
 def unit_dir() -> Path:
     base = os.environ.get("XDG_CONFIG_HOME")
     root = Path(base) if base else Path.home() / ".config"
@@ -117,6 +140,7 @@ def build_plan(
     hour, _, minute = send_time.partition(":")
     calendar = f"*-*-* {int(hour):02d}:{int(minute or 0):02d}:00 {timezone}"
 
+    working_dir = canonical_project_dir(Path(working_dir))
     target = directory or unit_dir()
     return UnitPlan(
         service_path=target / SERVICE_NAME,
