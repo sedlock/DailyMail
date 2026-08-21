@@ -25,3 +25,14 @@ incommon.pem
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Production collection output lives in XDG state, outside the repo. This is a
+# guard in case XDG_STATE_HOME is ever pointed inside the working tree.
+collections/
+*.collection.json
+
+# uv / build
+.venv/
+dist/
+*.egg-info/
+.pytest_cache/

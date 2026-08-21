@@ -1,0 +1,26 @@
+[project]
+name = "dailymail"
+version = "0.1.0"
+description = "Deterministic collector for Rowan Announcer announcements"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "certifi>=2024.2.2",
+]
+
+[project.scripts]
+dailymail = "dailymail.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dailymail"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
