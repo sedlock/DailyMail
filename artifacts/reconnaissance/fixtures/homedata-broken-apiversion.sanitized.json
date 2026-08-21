@@ -1,0 +1,11 @@
+{
+ "_note": "Response when apiVersion is stale/invalid. HTTP 200 but data=={} and hasApiVersionChanged==true. This is the silent-failure mode the collector MUST detect.",
+ "response": {
+  "versionInfo": {
+   "hasModuleVersionChanged": false,
+   "hasApiVersionChanged": true
+  },
+  "data": {},
+  "rolesInfo": ","
+ }
+}

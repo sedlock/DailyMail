@@ -1,0 +1,67 @@
+{
+ "_note": "Event announcement with event fields populated.",
+ "record": {
+  "FullBody": "<p><span style=\"background-color:transparent;color:#272b30;\"><i><strong>REGISTER TODAY!</strong>&nbsp;</i></span><span style=\"background-color:transparent;color:#1155cc;\"><i><strong><u>go.rowan.edu/2026WanConference</u></strong></i></span><span style=\"background-color:transparent;color:#272b30;\"><i>&nbsp;</i></span></p><p><span style=\"background-color:transparent;color:#212121;\"><i>The Women's Alliance Network (WAN) is excited to have you join us for&nbsp; on&nbsp;<strong>March 9th</strong>! Get ready for an empowering day of conversations, practical strategies, and networking opportunities designed to help you identify what’s holding you back — and move confidently toward your next level.</i></span></p><p><span style=\"background-color:transparent;color:#212121;\"><i><strong>Kicking Off the Conference</strong></i></span></p><p><span style=\"background-color:transparent;color:#212121;\"><i>We are honored to have&nbsp;<strong>Provost Vojislava “Voki” Pophristic</strong> deliver our opening remarks, setting the stage for a day of inspiration. Following her,&nbsp;<strong>Tracy Davidson</strong> will take the stage to inspire attendees to rise stronger, reset their focus, and begin breaking through what’s holding them back.</i></span></p><p><span style=\"background-color:transparent;color:#212121;\"><i><strong>Featured Speakers Include:</strong></i></span><br><span style=\"background-color:transparent;color:#212121;\"><i><strong>Tracy Davidson</strong> – Next Level Resilience: What’s Holding You Back from Rising Stronger?</i></span><br><span style=\"background-color:transparent;color:#212121;\"><i><strong>Dr. Kara Ieva</strong> – I Am an Emotional Support Human: Practicing SELF-Love at the Next Level</i></span><br><span style=\"background-color:transparent;color:#212121;\"><i><strong>Vernita Bostick&nbsp;</strong>– Put Down the Cape: From Superwoman to Sustainable Resilience for Your Next Level</i></span><br><span style=\"background-color:transparent;color:#212121;\"><i><strong>Cassandra Burnett</strong> – Silence to Strength: The Power of Being Seen and Heard</i></span><br><span style=\"background-color:transparent;color:#212121;\"><i><strong>Nicole Dubois&nbsp;</strong>– From Stuck to Sovereign: Unlearning Fear, Rewriting Your Story, and Rising Anyway</i></span></p><p><span style=\"background-color:transparent;color:#212121;\"><strong>Panel &amp; Workshop Highlights:</strong></span><br><span style=\"background-color:transparent;color:#212121;\"><i>The ABCS of Organizational-Wellness&nbsp;</i>– Featuring Brittanie Thomas</span><br><span style=\"background-color:transparent;color:#212121;\"><i>Breaking the Cycle: Unlearning the Patterns That Shape Our Lives</i> – Featuring Theresa Santucci, Becky Nieves, Patricia Coughlan &amp; Danielle Roberts. Moderated by Birdia Chambers.</span><br><span style=\"background-color:transparent;color:#212121;\"><i>Find Your Spark: What’s Holding You Back</i> – Featuring Krista Collings</span><br><span style=\"background-color:transparent;color:#212121;\"><i>Thriving Without a Blueprint: Choosing Yourself at Your Next Level</i> – Featuring Kashmala Khan, Dr. Ali Muller, Dr. Sanaz Shahi, &amp; Dr. Jacqueline Tawney. Moderated by Dr. Emily Cannon.</span><br><span style=\"background-color:transparent;color:#212121;\"><i>Dear You: A new, holistic, balanced, &amp; empowered you</i> – Featuring Lynda Smith</span><br><span style=\"background-color:transparent;color:#212121;\"><i>Why Not Me? Courageous Moves That Change Everything</i> – Featuring Dr. Joanne Connor, Taruna Chugeria, Elizabeth Jordan &amp; Beatrice Romao. Moderated by Dr. Lakeisha Carter.</span><br><br><span style=\"background-color:transparent;color:#212121;\"><i>This is an event you won’t want to miss!&nbsp;<strong>Full-day registration, including breakfast &amp; lunch, is just $49.</strong> Can't attend all day?&nbsp;<strong>Join us for select sessions for $29 (no meals included).</strong></i></span></p><p><span style=\"background-color:transparent;color:#212121;\"><i><strong>To</strong>&nbsp;<strong>register now, visit&nbsp;</strong></i></span><a target=\"_blank\" rel=\"noopener noreferrer\" href=\"http://go.rowan.edu/2026WANConference\"><span style=\"background-color:transparent;color:#1155cc;\"><i><strong><u>go.rowan.edu/2026WANConference</u></strong></i></span></a><span style=\"background-color:transparent;color:#212121;\"><i><strong>&nbsp;</strong></i></span></p>",
+  "Category": {
+   "Id": 18,
+   "Title": "Well-being and Health",
+   "Rank": 2,
+   "Is_Active": true,
+   "RestrictSubmitting": false,
+   "Color": "teal-dark",
+   "ApprovalProcess": "Organization"
+  },
+  "Submission": {
+   "Id": "5270",
+   "SubmittedByName": "[REDACTED_PERSON_NAME]",
+   "SubmittedByDepartment": "College of Science & Mathematics (S003110)",
+   "SubmittedByJobTitle": "College Operations Supervisor",
+   "SubmittedByPhone": "",
+   "SubmittedByEmail": "[REDACTED_EMAIL]",
+   "SubmittedDate": "2026-02-26T13:46:11Z",
+   "SubmittedStatus": "Approved",
+   "Audience": "Employees",
+   "Category": 18,
+   "Title": "Full Lineup & Sessions for the Next Level You: What's Holding You Back?",
+   "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+   "ExtraEdition": false,
+   "ExtraEditionDateSent": "1900-01-01T00:00:00",
+   "Event": true,
+   "EventName": "Next Level You: What's Holding You Back?",
+   "EventLocation": "Chamberlain Student Center",
+   "EventDate": "2026-03-09",
+   "EventStartTime": "09:00:00",
+   "EventEndTime": "16:00:00",
+   "EventNoEnd": false,
+   "ContactName": "[REDACTED_PERSON_NAME]",
+   "ContactDepartment": "Women's Alliance Network",
+   "ContactJobTitle": "Board Chair",
+   "ContactRowanEmail": "[REDACTED_EMAIL]",
+   "ContactPhone": "[REDACTED_PHONE]",
+   "QuestionForApprover": "",
+   "ReadyForSubmission": false,
+   "IsDeleted": false,
+   "RejectComment": "",
+   "RejectReasonId": "0",
+   "UpdatedByName": "[REDACTED_PERSON_NAME]",
+   "UpdatedDate": "2026-02-27T12:35:33Z",
+   "ApprovedDate": "2026-02-27T13:04:40Z",
+   "ApprovedByName": "[REDACTED_PERSON_NAME]",
+   "ApprovedByDepartment": "Technology Support Center & Training and Instructional (S027236)",
+   "ApprovedByJobTitle": "Director",
+   "ApprovedByPhone": "",
+   "ApprovedByEmail": "[REDACTED_EMAIL]",
+   "OldSubmissionId": 0
+  },
+  "SelectedCategory": true,
+  "ShortBody": " REGISTER TODAY!   go.rowan.edu/2026WanConference\r\n The Women's Alliance Network (WAN) is excited to have you join us for  on  March 9th ! Get ready for an empowering day of conversations, practical strategies, and networking opportunities designed to help you identify what’s holding you back — and ",
+  "DistributionDates": {
+   "List": [
+    "2026-02-28",
+    "2026-03-05",
+    "2026-03-07",
+    "2026-03-08"
+   ]
+  }
+ }
+}

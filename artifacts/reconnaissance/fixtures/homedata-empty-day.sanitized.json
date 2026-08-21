@@ -1,0 +1,271 @@
+{
+ "_note": "Genuine zero-announcement response. Note Categories IS still populated (33 entries) and TotalCount==\"0\" -- this is how a real empty day differs from a broken call.",
+ "TotalCount": "0",
+ "Categories": [
+  {
+   "Rank": 0,
+   "Title": "Official",
+   "Count": "0",
+   "Selected": false,
+   "Color": "secondary",
+   "Id": 2
+  },
+  {
+   "Rank": 0,
+   "Title": "Well-being and Health",
+   "Count": "0",
+   "Selected": false,
+   "Color": "teal-dark",
+   "Id": 18
+  },
+  {
+   "Rank": 0,
+   "Title": "Public Safety",
+   "Count": "0",
+   "Selected": false,
+   "Color": "orange-darker",
+   "Id": 3
+  },
+  {
+   "Rank": 0,
+   "Title": "Technology",
+   "Count": "0",
+   "Selected": false,
+   "Color": "blue-dark",
+   "Id": 20
+  },
+  {
+   "Rank": 0,
+   "Title": "Faculty",
+   "Count": "0",
+   "Selected": false,
+   "Color": "yellow-darker",
+   "Id": 4
+  },
+  {
+   "Rank": 0,
+   "Title": "Research",
+   "Count": "0",
+   "Selected": false,
+   "Color": "pink-darker",
+   "Id": 5
+  },
+  {
+   "Rank": 0,
+   "Title": "Union",
+   "Count": "0",
+   "Selected": false,
+   "Color": "blue-darker",
+   "Id": 6
+  },
+  {
+   "Rank": 0,
+   "Title": "Library",
+   "Count": "0",
+   "Selected": false,
+   "Color": "grape-darker",
+   "Id": 17
+  },
+  {
+   "Rank": 0,
+   "Title": "Social and Cultural Events",
+   "Count": "0",
+   "Selected": false,
+   "Color": "green-dark",
+   "Id": 7
+  },
+  {
+   "Rank": 0,
+   "Title": "Athletic Events",
+   "Count": "0",
+   "Selected": false,
+   "Color": "indigo-darker",
+   "Id": 8
+  },
+  {
+   "Rank": 0,
+   "Title": "Volunteer Opportunities",
+   "Count": "0",
+   "Selected": false,
+   "Color": "teal-light",
+   "Id": 9
+  },
+  {
+   "Rank": 0,
+   "Title": "Stratford Campus",
+   "Count": "0",
+   "Selected": false,
+   "Color": "yellow-dark",
+   "Id": 10
+  },
+  {
+   "Rank": 0,
+   "Title": "CMSRU",
+   "Count": "0",
+   "Selected": false,
+   "Color": "orange-light",
+   "Id": 11
+  },
+  {
+   "Rank": 0,
+   "Title": "Glassboro Campus",
+   "Count": "0",
+   "Selected": false,
+   "Color": "blue-darkest",
+   "Id": 12
+  },
+  {
+   "Rank": 0,
+   "Title": "Shreiber School of Veterinary Medicine",
+   "Count": "0",
+   "Selected": false,
+   "Color": "pink-light",
+   "Id": 26
+  },
+  {
+   "Rank": 0,
+   "Title": "Student Government",
+   "Count": "0",
+   "Selected": false,
+   "Color": "green-light",
+   "Id": 13
+  },
+  {
+   "Rank": 0,
+   "Title": "Campus Activities",
+   "Count": "0",
+   "Selected": false,
+   "Color": "violet-darker",
+   "Id": 14
+  },
+  {
+   "Rank": 0,
+   "Title": "Clubs and Organizations",
+   "Count": "0",
+   "Selected": false,
+   "Color": "cyan-light",
+   "Id": 15
+  },
+  {
+   "Rank": 0,
+   "Title": "Online Events",
+   "Count": "0",
+   "Selected": false,
+   "Color": "cyan-dark",
+   "Id": 19
+  },
+  {
+   "Rank": 0,
+   "Title": "Human Resources",
+   "Count": "0",
+   "Selected": false,
+   "Color": "red-light",
+   "Id": 21
+  },
+  {
+   "Rank": 0,
+   "Title": "The Arts & Events",
+   "Count": "0",
+   "Selected": false,
+   "Color": "grape-light",
+   "Id": 22
+  },
+  {
+   "Rank": 0,
+   "Title": "Registrar",
+   "Count": "0",
+   "Selected": false,
+   "Color": "lime-light",
+   "Id": 23
+  },
+  {
+   "Rank": 0,
+   "Title": "Our Stories!",
+   "Count": "0",
+   "Selected": false,
+   "Color": "lime-darkest",
+   "Id": 24
+  },
+  {
+   "Rank": 0,
+   "Title": "Academic and Career Success",
+   "Count": "0",
+   "Selected": false,
+   "Color": "violet",
+   "Id": 25
+  },
+  {
+   "Rank": 0,
+   "Title": "Finance",
+   "Count": "0",
+   "Selected": false,
+   "Color": "cyan",
+   "Id": 27
+  },
+  {
+   "Rank": 0,
+   "Title": "Facilities",
+   "Count": "0",
+   "Selected": false,
+   "Color": "lime-light",
+   "Id": 28
+  },
+  {
+   "Rank": 0,
+   "Title": "Academics",
+   "Count": "0",
+   "Selected": false,
+   "Color": "red-dark",
+   "Id": 29
+  },
+  {
+   "Rank": 0,
+   "Title": "Advancement",
+   "Count": "0",
+   "Selected": false,
+   "Color": "red-light",
+   "Id": 30
+  },
+  {
+   "Rank": 0,
+   "Title": "Payroll",
+   "Count": "0",
+   "Selected": false,
+   "Color": "blue-light",
+   "Id": 31
+  },
+  {
+   "Rank": 0,
+   "Title": "Web Services",
+   "Count": "0",
+   "Selected": false,
+   "Color": "teal-dark",
+   "Id": 32
+  },
+  {
+   "Rank": 0,
+   "Title": "Rowan Online",
+   "Count": "0",
+   "Selected": false,
+   "Color": "orange-dark",
+   "Id": 33
+  },
+  {
+   "Rank": 0,
+   "Title": "Rowan On",
+   "Count": "0",
+   "Selected": false,
+   "Color": "orange",
+   "Id": 34
+  },
+  {
+   "Rank": 0,
+   "Title": "Our Deepest Condolences",
+   "Count": "0",
+   "Selected": false,
+   "Color": "neutral-10",
+   "Id": 16
+  }
+ ],
+ "Announcements": []
+}

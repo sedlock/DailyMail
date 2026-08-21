@@ -1,0 +1,471 @@
+{
+ "_note": "SANITIZED recon fixture. Personal fields redacted; data: URI images truncated. Public announcement content preserved verbatim.",
+ "_source": "POST /RowanAnnouncer/screenservices/RowanAnnouncer/MainFlow/Home/ActionGetHomeData",
+ "_query": {
+  "Audience": "Students",
+  "StartDate": "2026-08-20",
+  "EndDate": "1900-01-01",
+  "MaxRecords": 500,
+  "StartIndex": 0
+ },
+ "TotalCount": "3",
+ "Categories": [
+  {
+   "Rank": 0,
+   "Title": "Official",
+   "Count": "0",
+   "Selected": false,
+   "Color": "secondary",
+   "Id": 2
+  },
+  {
+   "Rank": 0,
+   "Title": "Well-being and Health",
+   "Count": "1",
+   "Selected": false,
+   "Color": "teal-dark",
+   "Id": 18
+  },
+  {
+   "Rank": 0,
+   "Title": "Public Safety",
+   "Count": "1",
+   "Selected": false,
+   "Color": "orange-darker",
+   "Id": 3
+  },
+  {
+   "Rank": 0,
+   "Title": "Technology",
+   "Count": "0",
+   "Selected": false,
+   "Color": "blue-dark",
+   "Id": 20
+  },
+  {
+   "Rank": 0,
+   "Title": "Faculty",
+   "Count": "0",
+   "Selected": false,
+   "Color": "yellow-darker",
+   "Id": 4
+  },
+  {
+   "Rank": 0,
+   "Title": "Research",
+   "Count": "0",
+   "Selected": false,
+   "Color": "pink-darker",
+   "Id": 5
+  },
+  {
+   "Rank": 0,
+   "Title": "Union",
+   "Count": "0",
+   "Selected": false,
+   "Color": "blue-darker",
+   "Id": 6
+  },
+  {
+   "Rank": 0,
+   "Title": "Library",
+   "Count": "0",
+   "Selected": false,
+   "Color": "grape-darker",
+   "Id": 17
+  },
+  {
+   "Rank": 0,
+   "Title": "Social and Cultural Events",
+   "Count": "0",
+   "Selected": false,
+   "Color": "green-dark",
+   "Id": 7
+  },
+  {
+   "Rank": 0,
+   "Title": "Athletic Events",
+   "Count": "0",
+   "Selected": false,
+   "Color": "indigo-darker",
+   "Id": 8
+  },
+  {
+   "Rank": 0,
+   "Title": "Volunteer Opportunities",
+   "Count": "0",
+   "Selected": false,
+   "Color": "teal-light",
+   "Id": 9
+  },
+  {
+   "Rank": 0,
+   "Title": "Stratford Campus",
+   "Count": "0",
+   "Selected": false,
+   "Color": "yellow-dark",
+   "Id": 10
+  },
+  {
+   "Rank": 0,
+   "Title": "CMSRU",
+   "Count": "0",
+   "Selected": false,
+   "Color": "orange-light",
+   "Id": 11
+  },
+  {
+   "Rank": 0,
+   "Title": "Glassboro Campus",
+   "Count": "0",
+   "Selected": false,
+   "Color": "blue-darkest",
+   "Id": 12
+  },
+  {
+   "Rank": 0,
+   "Title": "Shreiber School of Veterinary Medicine",
+   "Count": "0",
+   "Selected": false,
+   "Color": "pink-light",
+   "Id": 26
+  },
+  {
+   "Rank": 0,
+   "Title": "Student Government",
+   "Count": "0",
+   "Selected": false,
+   "Color": "green-light",
+   "Id": 13
+  },
+  {
+   "Rank": 0,
+   "Title": "Campus Activities",
+   "Count": "0",
+   "Selected": false,
+   "Color": "violet-darker",
+   "Id": 14
+  },
+  {
+   "Rank": 0,
+   "Title": "Clubs and Organizations",
+   "Count": "0",
+   "Selected": false,
+   "Color": "cyan-light",
+   "Id": 15
+  },
+  {
+   "Rank": 0,
+   "Title": "Online Events",
+   "Count": "0",
+   "Selected": false,
+   "Color": "cyan-dark",
+   "Id": 19
+  },
+  {
+   "Rank": 0,
+   "Title": "Human Resources",
+   "Count": "0",
+   "Selected": false,
+   "Color": "red-light",
+   "Id": 21
+  },
+  {
+   "Rank": 0,
+   "Title": "The Arts & Events",
+   "Count": "0",
+   "Selected": false,
+   "Color": "grape-light",
+   "Id": 22
+  },
+  {
+   "Rank": 0,
+   "Title": "Registrar",
+   "Count": "0",
+   "Selected": false,
+   "Color": "lime-light",
+   "Id": 23
+  },
+  {
+   "Rank": 0,
+   "Title": "Our Stories!",
+   "Count": "0",
+   "Selected": false,
+   "Color": "lime-darkest",
+   "Id": 24
+  },
+  {
+   "Rank": 0,
+   "Title": "Academic and Career Success",
+   "Count": "1",
+   "Selected": false,
+   "Color": "violet",
+   "Id": 25
+  },
+  {
+   "Rank": 0,
+   "Title": "Finance",
+   "Count": "0",
+   "Selected": false,
+   "Color": "cyan",
+   "Id": 27
+  },
+  {
+   "Rank": 0,
+   "Title": "Facilities",
+   "Count": "0",
+   "Selected": false,
+   "Color": "lime-light",
+   "Id": 28
+  },
+  {
+   "Rank": 0,
+   "Title": "Academics",
+   "Count": "0",
+   "Selected": false,
+   "Color": "red-dark",
+   "Id": 29
+  },
+  {
+   "Rank": 0,
+   "Title": "Advancement",
+   "Count": "0",
+   "Selected": false,
+   "Color": "red-light",
+   "Id": 30
+  },
+  {
+   "Rank": 0,
+   "Title": "Payroll",
+   "Count": "0",
+   "Selected": false,
+   "Color": "blue-light",
+   "Id": 31
+  },
+  {
+   "Rank": 0,
+   "Title": "Web Services",
+   "Count": "0",
+   "Selected": false,
+   "Color": "teal-dark",
+   "Id": 32
+  },
+  {
+   "Rank": 0,
+   "Title": "Rowan Online",
+   "Count": "0",
+   "Selected": false,
+   "Color": "orange-dark",
+   "Id": 33
+  },
+  {
+   "Rank": 0,
+   "Title": "Rowan On",
+   "Count": "0",
+   "Selected": false,
+   "Color": "orange",
+   "Id": 34
+  },
+  {
+   "Rank": 0,
+   "Title": "Our Deepest Condolences",
+   "Count": "0",
+   "Selected": false,
+   "Color": "neutral-10",
+   "Id": 16
+  }
+ ],
+ "Announcements": [
+  {
+   "FullBody": "<p style=\"margin-left:0px;\">Applications for Mini-Grants from our Profs for a Purpose: Suicide Prevention Walk are now open! &nbsp;The annual Rowan Profs for a Purpose: Suicide Prevention Walk is an event each April or May that allows our campus community to honor lives lost to suicide and also educate and support our community on suicide prevention and mental health. We also provide resources and share in activities that ignite hope and care. Participation is free, but individuals and teams can also donate to this cause. Every dollar donated directly supports Rowan students, faculty, staff and community through supportive and educational programming and efforts for <u>suicide prevention and improving mental health</u>. Last year our walk raised over $5,000! <i>All of those funds raised at the Profs for a Purpose: Suicide Prevention Walk were raised by individuals and their commitment to mental health and suicide prevention</i>&nbsp;- this speaks volumes for how much our community cares! One of the ways those funds are distributed is through our Mini-Grants.&nbsp;</p><p style=\"margin-left:0px;\">This year we are awarding up to $3,000 in grants named in honor of the top 5 teams from 2026 in order of funds raised: Mental Health Warriors, Thriving Together, RLUH &amp; Friends, Social Work in Action, Rowan Catholic Campus Ministry. Students, Faculty, Staff and other Rowan community members are all eligible to apply for a grant for up to $300. The grant recipients may include a list of items for purchase, and those items will be processed through the Center for Well-Being office, or the grant recipient may choose to receive the grant via DCA. Grants can only be dispersed in these two ways.&nbsp;&nbsp;</p><p style=\"margin-left:0px;\"><span style=\"color:black;\">Projects should support efforts to address mental health, mental illness, or suicide prevention through one or more of the following: education, resources, belonging/connection, and/or research. Mini grants will be awarded for projects that will take place before September 2027. Application Deadline is Friday, October 23rd, 2026 by 4pm and recipients will be announced on Wednesday, November 4th, 2026. Please note: anyone who was awarded a mini-grant in the fall of 2025 will be eligible to apply again in fall of 2027 (i.e. If you’re a recipient of a previous grant, you must wait one year to reapply).</span></p><p style=\"margin-left:0px;\">Application can be found at this link: <a target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://forms.gle/kfYnZPkJFkN4D4bB8\">https://forms.gle/kfYnZPkJFkN4D4bB8</a> or you can find more information here: <a target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://go.rowan.edu/ProfsMiniGrant\"><span style=\"background-color:transparent;color:#1155cc;\"><u>https://go.rowan.edu/ProfsMiniGrant</u></span></a></p><p style=\"margin-left:0px;\">And Join us for our 10th Profs for A Purpose: Suicide Prevention Walk taking place Saturday, April 17th,&nbsp; 2027.</p>",
+   "Category": {
+    "Id": 18,
+    "Title": "Well-being and Health",
+    "Rank": 2,
+    "Is_Active": true,
+    "RestrictSubmitting": false,
+    "Color": "teal-dark",
+    "ApprovalProcess": "Organization"
+   },
+   "Submission": {
+    "Id": "6623",
+    "SubmittedByName": "[REDACTED_PERSON_NAME]",
+    "SubmittedByDepartment": "Counseling and Psychological Services (S002430)",
+    "SubmittedByJobTitle": "Licensed Professional Counselor",
+    "SubmittedByPhone": "",
+    "SubmittedByEmail": "[REDACTED_EMAIL]",
+    "SubmittedDate": "2026-08-18T19:20:31Z",
+    "SubmittedStatus": "Approved",
+    "Audience": "Both",
+    "Category": 18,
+    "Title": "Profs for a Purpose: Mini-Grant Proposals Open ",
+    "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+    "ExtraEdition": false,
+    "ExtraEditionDateSent": "1900-01-01T00:00:00",
+    "Event": false,
+    "EventName": "",
+    "EventLocation": "",
+    "EventDate": "1900-01-01",
+    "EventStartTime": "00:00:00",
+    "EventEndTime": "00:00:00",
+    "EventNoEnd": false,
+    "ContactName": "[REDACTED_PERSON_NAME]",
+    "ContactDepartment": "Center for Well-Being",
+    "ContactJobTitle": "Assistant Director of Well-Being ",
+    "ContactRowanEmail": "[REDACTED_EMAIL]",
+    "ContactPhone": "[REDACTED_PHONE]",
+    "QuestionForApprover": "",
+    "ReadyForSubmission": false,
+    "IsDeleted": false,
+    "RejectComment": "",
+    "RejectReasonId": "0",
+    "UpdatedByName": "",
+    "UpdatedDate": "1900-01-01T00:00:00",
+    "ApprovedDate": "2026-08-19T15:23:07Z",
+    "ApprovedByName": "[REDACTED_PERSON_NAME]",
+    "ApprovedByDepartment": "Academic Affairs (S000881)",
+    "ApprovedByJobTitle": "Assistant Vice President for Community Health & Well-Being",
+    "ApprovedByPhone": "",
+    "ApprovedByEmail": "[REDACTED_EMAIL]",
+    "OldSubmissionId": 0
+   },
+   "SelectedCategory": true,
+   "ShortBody": "Applications for Mini-Grants from our Profs for a Purpose: Suicide Prevention Walk are now open!  The annual Rowan Profs for a Purpose: Suicide Prevention Walk is an event each April or May that allows our campus community to honor lives lost to suicide and also educate and support our community on ",
+   "DistributionDates": {
+    "List": [
+     "2026-08-20",
+     "2026-08-24",
+     "2026-09-01",
+     "2026-09-09"
+    ]
+   }
+  },
+  {
+   "FullBody": "<p>Parking Lot O-1 will be closed on Wednesday, August 19, 2026 at 10 pm. &nbsp;The lot will remain closed until Monday, August 24, 2026. &nbsp;</p>",
+   "Category": {
+    "Id": 3,
+    "Title": "Public Safety",
+    "Rank": 3,
+    "Is_Active": true,
+    "RestrictSubmitting": false,
+    "Color": "orange-darker",
+    "ApprovalProcess": "Organization"
+   },
+   "Submission": {
+    "Id": "6622",
+    "SubmittedByName": "[REDACTED_PERSON_NAME]",
+    "SubmittedByDepartment": "Department of Public Safety (S001627)",
+    "SubmittedByJobTitle": "Public Safety  Administrator",
+    "SubmittedByPhone": "[REDACTED_PHONE]",
+    "SubmittedByEmail": "[REDACTED_EMAIL]",
+    "SubmittedDate": "2026-08-18T17:50:49Z",
+    "SubmittedStatus": "Approved",
+    "Audience": "Both",
+    "Category": 3,
+    "Title": " Parking Lot O-1  Closure",
+    "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+    "ExtraEdition": false,
+    "ExtraEditionDateSent": "1900-01-01T00:00:00",
+    "Event": false,
+    "EventName": "",
+    "EventLocation": "",
+    "EventDate": "1900-01-01",
+    "EventStartTime": "00:00:00",
+    "EventEndTime": "00:00:00",
+    "EventNoEnd": false,
+    "ContactName": "",
+    "ContactDepartment": "Parking Office",
+    "ContactJobTitle": "",
+    "ContactRowanEmail": "[REDACTED_EMAIL]",
+    "ContactPhone": "[REDACTED_PHONE]",
+    "QuestionForApprover": "",
+    "ReadyForSubmission": false,
+    "IsDeleted": false,
+    "RejectComment": "",
+    "RejectReasonId": "0",
+    "UpdatedByName": "",
+    "UpdatedDate": "1900-01-01T00:00:00",
+    "ApprovedDate": "2026-08-18T17:50:59Z",
+    "ApprovedByName": "[REDACTED_PERSON_NAME]",
+    "ApprovedByDepartment": "Department of Public Safety (S001627)",
+    "ApprovedByJobTitle": "Public Safety  Administrator",
+    "ApprovedByPhone": "[REDACTED_PHONE]",
+    "ApprovedByEmail": "[REDACTED_EMAIL]",
+    "OldSubmissionId": 0
+   },
+   "SelectedCategory": true,
+   "ShortBody": "Parking Lot O-1 will be closed on Wednesday, August 19, 2026 at 10 pm.  The lot will remain closed until Monday, August 24, 2026.",
+   "DistributionDates": {
+    "List": [
+     "2026-08-20",
+     "2026-08-21",
+     "2026-08-23"
+    ]
+   }
+  },
+  {
+   "FullBody": "<p>The English Language Program (ELP) at Rowan University is back on our Camden Campus and will maintain classes on our Glassboro Campus starting <strong>September 1</strong>!</p><p>These classes are <strong><u>open to anyone </u></strong>who is a multilingual (ESL) learner and wants to improve their language skills for academic or personal growth. We offer 5 Levels and accept all levels of proficiency!</p><p><strong>Glassboro</strong></p><p><strong>Schedule: &nbsp;</strong>9 a.m. - 2:35 p.m. Monday - Thursday</p><p><strong>Costs</strong>:</p><p>International Students - $1500 per 7 week-session / $3000 a semester</p><p>Local / New Jersey residents - $750 per 7-week session / $1500 per semester&nbsp;</p><p><strong>Camden</strong></p><p><strong>Schedule:&nbsp;</strong>10 a.m. - 1 p.m. Monday - Thursday</p><p><strong>Costs</strong>:</p><p>Local / New Jersey residents - $550 per 7-week session / $1100 per semester.</p><p>Outside of New Jersey - $1500 per 7-week session / $3000 a semester.</p><p>$45.00 application fee is waived using the code: CAMDEN</p><p><strong>Online/Hybrid</strong> options are available!</p><p>If interested, please contact <a href=\"mailto:elp@rowan.edu\">elp@rowan.edu</a> or 856.256.5768 - We are on WhatsApp - Se habla español.&nbsp;</p><p>Application Link - <a target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://docs.google.com/forms/d/e/1FAIpQLSc7clJZoznLJ_ZfdVFjG6D6mY-h8q-hgvIlgNsUyD2YONuNSg/viewform\">English Language Program (ELP) at Rowan University Application Form</a></p><p>Website Link - <a target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://sites.rowan.edu/international/elp/\">English Language Program - https://sites.rowan.edu/international/elp/</a></p>",
+   "Category": {
+    "Id": 25,
+    "Title": "Academic and Career Success",
+    "Rank": 24,
+    "Is_Active": true,
+    "RestrictSubmitting": false,
+    "Color": "violet",
+    "ApprovalProcess": "Organization"
+   },
+   "Submission": {
+    "Id": "6492",
+    "SubmittedByName": "[REDACTED_PERSON_NAME]",
+    "SubmittedByDepartment": "Intensive English Language Programs (S001926)",
+    "SubmittedByJobTitle": "Assistant Director, IELP",
+    "SubmittedByPhone": "",
+    "SubmittedByEmail": "[REDACTED_EMAIL]",
+    "SubmittedDate": "2026-08-03T16:07:01Z",
+    "SubmittedStatus": "Approved",
+    "Audience": "Both",
+    "Category": 25,
+    "Title": "English Language Program - Camden and Glassboro - Classes Start Sept 1!",
+    "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+    "ExtraEdition": false,
+    "ExtraEditionDateSent": "1900-01-01T00:00:00",
+    "Event": false,
+    "EventName": "",
+    "EventLocation": "",
+    "EventDate": "1900-01-01",
+    "EventStartTime": "00:00:00",
+    "EventEndTime": "00:00:00",
+    "EventNoEnd": false,
+    "ContactName": "[REDACTED_PERSON_NAME]",
+    "ContactDepartment": "ELP - English Language Programs Rowan University",
+    "ContactJobTitle": "Assistant Director, English Language Program",
+    "ContactRowanEmail": "[REDACTED_EMAIL]",
+    "ContactPhone": "[REDACTED_PHONE]",
+    "QuestionForApprover": "",
+    "ReadyForSubmission": false,
+    "IsDeleted": false,
+    "RejectComment": "",
+    "RejectReasonId": "0",
+    "UpdatedByName": "",
+    "UpdatedDate": "1900-01-01T00:00:00",
+    "ApprovedDate": "2026-08-03T16:50:45Z",
+    "ApprovedByName": "[REDACTED_PERSON_NAME]",
+    "ApprovedByDepartment": "Academic Affairs (S000881)",
+    "ApprovedByJobTitle": "Vice President",
+    "ApprovedByPhone": "[REDACTED_PHONE]",
+    "ApprovedByEmail": "[REDACTED_EMAIL]",
+    "OldSubmissionId": 0
+   },
+   "SelectedCategory": true,
+   "ShortBody": "The English Language Program (ELP) at Rowan University is back on our Camden Campus and will maintain classes on our Glassboro Campus starting September 1 !\r\nThese classes are open to anyone who is a multilingual (ESL) learner and wants to improve their language skills for academic or personal growt",
+   "DistributionDates": {
+    "List": [
+     "2026-08-06",
+     "2026-08-12",
+     "2026-08-20",
+     "2026-08-28"
+    ]
+   }
+  }
+ ]
+}

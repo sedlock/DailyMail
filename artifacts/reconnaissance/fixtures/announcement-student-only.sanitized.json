@@ -1,0 +1,64 @@
+{
+ "_note": "Student-only announcement (Audience==\"Students\").",
+ "record": {
+  "FullBody": "<p>Join Professor Patti Coughlan for her talk on Perfectionism…Because Straight A's and Sleepless Nights go hand in hand.</p><p>Monday, April 13th, 5pm, Enterprise 509.</p>",
+  "Category": {
+   "Id": 18,
+   "Title": "Well-being and Health",
+   "Rank": 2,
+   "Is_Active": true,
+   "RestrictSubmitting": false,
+   "Color": "teal-dark",
+   "ApprovalProcess": "Organization"
+  },
+  "Submission": {
+   "Id": "5935",
+   "SubmittedByName": "[REDACTED_PERSON_NAME]",
+   "SubmittedByDepartment": "Communication Studies Department (S003341)",
+   "SubmittedByJobTitle": "Teaching Professor",
+   "SubmittedByPhone": "",
+   "SubmittedByEmail": "[REDACTED_EMAIL]",
+   "SubmittedDate": "2026-04-12T14:32:36Z",
+   "SubmittedStatus": "Approved",
+   "Audience": "Students",
+   "Category": 18,
+   "Title": "A Talk on Perfectionism!! ",
+   "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+   "ExtraEdition": false,
+   "ExtraEditionDateSent": "1900-01-01T00:00:00",
+   "Event": false,
+   "EventName": "",
+   "EventLocation": "",
+   "EventDate": "1900-01-01",
+   "EventStartTime": "00:00:00",
+   "EventEndTime": "00:00:00",
+   "EventNoEnd": false,
+   "ContactName": "[REDACTED_PERSON_NAME]",
+   "ContactDepartment": "Rowan University",
+   "ContactJobTitle": "Associate Teaching Professor",
+   "ContactRowanEmail": "[REDACTED_EMAIL]",
+   "ContactPhone": "[REDACTED_PHONE]",
+   "QuestionForApprover": "we had a room change so I had to wait until the last minute to post - it's probably too late but thought I would try!!",
+   "ReadyForSubmission": false,
+   "IsDeleted": false,
+   "RejectComment": "",
+   "RejectReasonId": "0",
+   "UpdatedByName": "",
+   "UpdatedDate": "1900-01-01T00:00:00",
+   "ApprovedDate": "2026-04-12T21:02:30Z",
+   "ApprovedByName": "[REDACTED_PERSON_NAME]",
+   "ApprovedByDepartment": "Academic Affairs (S000881)",
+   "ApprovedByJobTitle": "Associate Provost",
+   "ApprovedByPhone": "",
+   "ApprovedByEmail": "[REDACTED_EMAIL]",
+   "OldSubmissionId": 0
+  },
+  "SelectedCategory": true,
+  "ShortBody": "Join Professor Patti Coughlan for her talk on Perfectionism…Because Straight A's and Sleepless Nights go hand in hand.\r\nMonday, April 13th, 5pm, Enterprise 509.",
+  "DistributionDates": {
+   "List": [
+    "2026-04-13"
+   ]
+  }
+ }
+}

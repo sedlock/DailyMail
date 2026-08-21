@@ -1,0 +1,27 @@
+# Node / Playwright (recon tooling only)
+node_modules/
+package.json
+package-lock.json
+
+# Raw reconnaissance dumps: NOT committed.
+# These contain the unredacted `User` objects the Rowan API over-exposes
+# (Username, External_Id / 9-digit Banner ID, Last_Login, Password key) plus
+# multi-MB inline base64 images. Sanitized fixtures live in
+# artifacts/reconnaissance/fixtures/ and ARE committed.
+artifacts/reconnaissance/html/
+artifacts/reconnaissance/network/
+artifacts/reconnaissance/screenshots/
+*.har
+
+# Local CA bundle (derived; regenerate per endpoint-summary.md)
+*-ca-bundle.pem
+incommon.crt
+incommon.pem
+
+# Never commit
+.env
+*.secret
+
+# Python bytecode
+__pycache__/
+*.pyc

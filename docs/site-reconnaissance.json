@@ -1,0 +1,1566 @@
+{
+  "_meta": {
+    "report": "docs/site-reconnaissance.md",
+    "phase": "0 - reconnaissance only",
+    "investigated_on": "2026-08-21",
+    "target": "https://apps.rowan.edu/RowanAnnouncer/",
+    "method": "Playwright/Chromium 151 network capture + direct HTTP probes",
+    "read_only": true,
+    "notes": "Personal contact values redacted. See _privacy_warning."
+  },
+  "_privacy_warning": {
+    "issue": "ActionGetHomeData embeds a per-record `User` object containing Username, External_Id (9-digit Banner ID), Last_Login and a Password key (empty in all observations); Submission also carries SubmittedByExternalId.",
+    "action_required": "DailyMail must drop `User` and all *ExternalId fields at ingest and never persist them.",
+    "fixtures_sanitized": true
+  },
+  "application_architecture": {
+    "platform": "OutSystems Reactive Web (React SPA)",
+    "module": "RowanAnnouncer",
+    "theme_module": "Rowan_TH",
+    "app_key": "e765d296-318e-4c77-b5de-738354fd07e6",
+    "module_key": "e1a885c7-412b-45f5-b532-2c4c27f79958",
+    "home_screen": "MainFlow.Home",
+    "server_side_rendered": false,
+    "javascript_required_for_ui": true,
+    "javascript_required_for_api": false,
+    "authentication_required_to_read": false,
+    "cookies_set_during_anonymous_browsing": false,
+    "body_editor": "CKEditor 5 Classic",
+    "analytics": [
+      "Google Analytics G-Q3PR2WYYHW",
+      "OutSystems ECT (WS_ECT.asmx)"
+    ]
+  },
+  "tls": {
+    "defect": "server omits intermediate certificate; stock clients fail verification",
+    "openssl_verify_return_code": 21,
+    "leaf_subject": "C=US, ST=New Jersey, O=Rowan University, CN=apps.rowan.edu",
+    "missing_intermediate": "C=US, O=Internet2, CN=InCommon RSA Server CA 2",
+    "intermediate_aia_uri": "http://crt.sectigo.com/InCommonRSAServerCA2.crt",
+    "root_in_system_store": "USERTrust RSA Certification Authority",
+    "recommendation": "pin the InCommon intermediate in a custom CA bundle; keep verification enabled; do NOT disable TLS verification",
+    "verified_working_with_pinned_bundle": true
+  },
+  "version_tokens": {
+    "note": "All discoverable at runtime; rotate on Rowan redeploy. Collector should re-discover rather than hardcode.",
+    "moduleVersion": {
+      "observed": "EEtZtRyG_45VdflpWRQexA",
+      "source": "GET /RowanAnnouncer/moduleservices/moduleinfo -> .manifest.versionToken",
+      "mismatch_behaviour": "tolerated; full data still returned, hasModuleVersionChanged=true"
+    },
+    "apiVersion_GetHomeData": {
+      "observed": "C1CrfYuM0JxcZElpjPJRPw",
+      "source": "regex AnonymousCSRF-style scan of /RowanAnnouncer/scripts/RowanAnnouncer.MainFlow.Home.mvc.js for callServerAction(\"GetHomeData\", \"<path>\", \"<apiVersion>\")",
+      "mismatch_behaviour": "SILENT FAILURE: HTTP 200 with data:{} and hasApiVersionChanged=true"
+    },
+    "csrf_token": {
+      "observed": "T6C+9iB49TLra4jEsMeSckDMNhQ=",
+      "source": "/RowanAnnouncer/scripts/OutSystems.js -> AnonymousCSRFToken=\"...\"",
+      "nature": "OutSystems platform-wide anonymous constant, not a secret, not per-session",
+      "stable_across_sessions": true,
+      "header_name": "X-CSRFToken",
+      "absent_behaviour": "HTTP 403 {\"exception\":{\"message\":\"Invalid Login\"}}",
+      "bogus_value_behaviour": "HTTP 200 with full data - only header PRESENCE is validated"
+    },
+    "indexVersionToken": {
+      "observed": "793HFACiHRbhpHsEJd5tgw",
+      "source": "OSManifestLoader.indexVersionToken in / HTML"
+    }
+  },
+  "discovered_endpoints": {
+    "primary": {
+      "name": "GetHomeData",
+      "url": "https://apps.rowan.edu/RowanAnnouncer/screenservices/RowanAnnouncer/MainFlow/Home/ActionGetHomeData",
+      "method": "POST",
+      "required_headers": {
+        "Content-Type": "application/json; charset=UTF-8",
+        "Accept": "application/json",
+        "X-CSRFToken": "<AnonymousCSRFToken>"
+      },
+      "cookies_required": false,
+      "auth_required": false,
+      "callable_without_browser": true,
+      "response_content_type": "application/json; charset=utf-8",
+      "returns_everything_needed": true,
+      "detail_page_fetch_needed": false
+    },
+    "other_read_only": [
+      {
+        "path": "screenservices/RowanAnnouncer/MainFlow/Announcements/ActionGetActiveCategories",
+        "apiVersion": "IXIuCWKtXoXdaRePqmn2Sg"
+      },
+      {
+        "path": "screenservices/RowanAnnouncer/MainFlow/Announcement/ScreenDataSetGetCompositeSubmission",
+        "apiVersion": "9D6MJemN7BWSrfbp2c1dZw"
+      },
+      {
+        "path": "screenservices/RowanAnnouncer/MainFlow/Announcement/ScreenDataSetGetDistributionDatesBySubmissionId",
+        "apiVersion": "4FH19u5OeIj8+DoNkPF_Xg"
+      },
+      {
+        "path": "screenservices/RowanAnnouncer/MainFlow/Announcement_Details/ScreenDataSetGetSubmissionById",
+        "apiVersion": null
+      },
+      {
+        "path": "screenservices/RowanAnnouncer/MainFlow/Announcement/ActionBinaryDataToText",
+        "apiVersion": "n5z0sC15lkHjxiRWqo+3gQ"
+      },
+      {
+        "path": "moduleservices/moduleinfo",
+        "method": "GET"
+      }
+    ],
+    "FORBIDDEN_write_endpoints": [
+      "MainFlow/Announcement/ActionSaveSubmission",
+      "MainFlow/Announcement/ActionUpdateSubmissionStatus",
+      "MainFlow/Announcements/ActionUpdateSubmissionStatus",
+      "MainFlow/Announcement/ActionCreateApproversForSubmission",
+      "MainFlow/Announcement/ActionGetAIRewriteResult",
+      "MainFlow/Announcement/ActionSaveVisitorClicks",
+      "MainFlow/Home/ActionSaveVisitorClicks",
+      "MainFlow/EmailAdmin/ActionSendDailyMail",
+      "MainFlow/EmailAdmin/ActionTest_DistributeExtraEditionByDate",
+      "MainFlow/AllEntities/ActionImportLegacyAnnouncements",
+      "MainFlow/AllEntities/ActionDownloadData",
+      "MainFlow/AllSubmissions/ActionExportSubmissionsToExcel",
+      "MainFlow/AllSubmissions/ActionTest_CreateSubmissionForEachCategory",
+      "MainFlow/CategoryForm/ActionSaveCategory",
+      "MainFlow/CategoryAdmin/ActionSaveAlertMessage",
+      "MainFlow/CategoryOrganizationForm/ActionSaveOrgCategoryApprover",
+      "MainFlow/CategoryOrganizationForm/ActionSaveOrgCategorySubmitter",
+      "MainFlow/CategoryOrganizationForm/ActionDeleteOrgCategoryApprover",
+      "MainFlow/CategoryOrganizationForm/ActionDeleteOrgCategorySubmitter",
+      "MainFlow/Announcement_Details/ActionCreateCalendarInvite",
+      "Common/Login/ActionDoLogin",
+      "Rowan_TH/Common/UserInfo/ActionDoLogout"
+    ],
+    "absent": {
+      "graphql": false,
+      "rest_resource_urls": false,
+      "read_form_posts": false
+    }
+  },
+  "query_parameters": {
+    "url_level": {
+      "Audience": {
+        "values": [
+          "Employees",
+          "Students"
+        ],
+        "required": true,
+        "maps_to": "inputParameters.Filters.Audience",
+        "invalid_value_behaviour": "SILENT: returns only the Audience=='Both' subset instead of erroring"
+      },
+      "CurrentDate": {
+        "format": "YYYY-MM-DD",
+        "honoured": true,
+        "maps_to": "inputParameters.Filters.StartDate",
+        "invalid_value_behaviour": "SILENT fallback to today",
+        "historical_supported": true,
+        "future_supported": true
+      },
+      "Category": {
+        "format": "int",
+        "maps_to": "inputParameters.Filters.SelectedCategories.List",
+        "note": "changes the URL; not needed by DailyMail"
+      },
+      "SubmissionId": {
+        "used_on": "/RowanAnnouncer/Announcement",
+        "format": "int"
+      }
+    },
+    "api_level": {
+      "Filters.Audience": "Employees | Students",
+      "Filters.StartDate": "YYYY-MM-DD target date",
+      "Filters.EndDate": "1900-01-01 = single-day sentinel; a real date switches to inclusive RANGE mode",
+      "Filters.CategoryIds": "{List:[],EmptyListItem:{}} - always empty in observed traffic",
+      "Filters.SelectedCategories": "{List:[<int>],EmptyListItem:0} - category filter",
+      "Filters.keywords": "free-text search, empty for full listing",
+      "StartIndex": "0-based pagination offset",
+      "MaxRecords": "page size; UI always sends 20; honoured up to at least 100000; <=0 raises 'Error executing query.'",
+      "IsCategoryUpdate": "false for normal load"
+    }
+  },
+  "pagination": {
+    "exists": true,
+    "mechanism": "StartIndex + MaxRecords",
+    "ui_default_page_size": 20,
+    "ui_has_load_more_button": true,
+    "ui_infinite_scroll": false,
+    "scrolling_triggers_additional_fetch": false,
+    "demonstrated_ui_data_loss": {
+      "date": "2025-03-05",
+      "audience": "Employees",
+      "server_TotalCount": 27,
+      "rendered_in_dom": 20,
+      "missed": 7
+    },
+    "api_single_call_can_return_all": true,
+    "max_records_stress_test": {
+      "range": "2020-01-01..2030-12-31",
+      "TotalCount": 5125,
+      "returned_with_MaxRecords_100000": 5125
+    },
+    "range_mode_emits_each_submissionid_once": true,
+    "start_index_beyond_end_returns": 0
+  },
+  "announcement_field_schema": {
+    "_presence_basis": "1756 Employee-visible announcements with a 2026 distribution date",
+    "_sentinels_meaning_null": [
+      "1900-01-01",
+      "1900-01-01T00:00:00",
+      "00:00:00",
+      "0",
+      ""
+    ],
+    "wrapper": {
+      "FullBody": {
+        "type": "html",
+        "presence": "always",
+        "note": "byte-identical to base64decode(SubmissionBody) in 1756/1756"
+      },
+      "ShortBody": {
+        "type": "text",
+        "presence": "always",
+        "note": "truncated teaser"
+      },
+      "SelectedCategory": {
+        "type": "bool",
+        "presence": "always",
+        "note": "UI artefact"
+      },
+      "DistributionDates.List": {
+        "type": "array[date]",
+        "presence": "always",
+        "note": "KEY for New vs Standing"
+      },
+      "Category": {
+        "type": "object",
+        "presence": "always"
+      },
+      "Submission": {
+        "type": "object",
+        "presence": "always"
+      },
+      "User": {
+        "type": "object",
+        "presence": "always",
+        "PII": true,
+        "action": "DROP at ingest"
+      }
+    },
+    "submission": {
+      "Id": {
+        "type": "string(int)",
+        "presence": "always",
+        "role": "PRIMARY KEY"
+      },
+      "Title": {
+        "type": "string",
+        "presence": "always",
+        "note": "often has leading/trailing whitespace - trim"
+      },
+      "SubmissionBody": {
+        "type": "base64(html)",
+        "presence": "always",
+        "note": "redundant duplicate of FullBody"
+      },
+      "Category": {
+        "type": "int",
+        "presence": "always",
+        "role": "FK to category Id"
+      },
+      "Audience": {
+        "type": "enum",
+        "values": [
+          "Employees",
+          "Students",
+          "Both"
+        ],
+        "presence": "always"
+      },
+      "SubmittedStatus": {
+        "type": "string",
+        "presence": "always",
+        "observed": [
+          "Approved"
+        ],
+        "note": "Approved for 5125/5125 public records"
+      },
+      "SubmittedDate": {
+        "type": "iso8601Z",
+        "presence": "always"
+      },
+      "ApprovedDate": {
+        "type": "iso8601Z",
+        "presence": "always"
+      },
+      "SubmittedByName": {
+        "type": "string",
+        "presence": "always",
+        "pii": true
+      },
+      "SubmittedByDepartment": {
+        "type": "string",
+        "presence": "always"
+      },
+      "SubmittedByJobTitle": {
+        "type": "string",
+        "presence": "99.9%"
+      },
+      "SubmittedByEmail": {
+        "type": "string",
+        "presence": "always",
+        "pii": true
+      },
+      "SubmittedByPhone": {
+        "type": "string",
+        "presence": "20.3%",
+        "optional": true,
+        "pii": true
+      },
+      "SubmittedById": {
+        "type": "int",
+        "presence": "always",
+        "pii": true
+      },
+      "SubmittedByExternalId": {
+        "type": "string",
+        "presence": "always",
+        "pii": true,
+        "note": "9-digit Banner ID - DROP"
+      },
+      "ApprovedByName": {
+        "type": "string",
+        "presence": "always",
+        "pii": true
+      },
+      "ApprovedByDepartment": {
+        "type": "string",
+        "presence": "always"
+      },
+      "ApprovedByJobTitle": {
+        "type": "string",
+        "presence": "always"
+      },
+      "ApprovedByEmail": {
+        "type": "string",
+        "presence": "always",
+        "pii": true
+      },
+      "ApprovedByPhone": {
+        "type": "string",
+        "presence": "42.0%",
+        "optional": true
+      },
+      "ApprovedById": {
+        "type": "int",
+        "presence": "always"
+      },
+      "ApproverExternalId": {
+        "type": "string",
+        "presence": "never set (0/1756)"
+      },
+      "ContactName": {
+        "type": "string",
+        "presence": "85.6%",
+        "optional": true
+      },
+      "ContactDepartment": {
+        "type": "string",
+        "presence": "always"
+      },
+      "ContactJobTitle": {
+        "type": "string",
+        "presence": "71.6%",
+        "optional": true
+      },
+      "ContactRowanEmail": {
+        "type": "string",
+        "presence": "always",
+        "note": "often a departmental mailbox"
+      },
+      "ContactPhone": {
+        "type": "string",
+        "presence": "always"
+      },
+      "Event": {
+        "type": "bool",
+        "presence": "19.4% true",
+        "note": "gate for all Event* fields"
+      },
+      "EventName": {
+        "type": "string",
+        "presence": "19.4%",
+        "only_when": "Event==true"
+      },
+      "EventDate": {
+        "type": "date",
+        "presence": "19.4%",
+        "only_when": "Event==true"
+      },
+      "EventStartTime": {
+        "type": "time",
+        "presence": "19.4%",
+        "only_when": "Event==true"
+      },
+      "EventEndTime": {
+        "type": "time",
+        "presence": "16.9%",
+        "note": "often unset even for events"
+      },
+      "EventLocation": {
+        "type": "string",
+        "presence": "19.4%",
+        "only_when": "Event==true"
+      },
+      "EventNoEnd": {
+        "type": "bool",
+        "presence": "never true"
+      },
+      "UpdatedDate": {
+        "type": "iso8601",
+        "presence": "16.1%",
+        "note": "NATIVE EDIT MARKER - use for change detection"
+      },
+      "UpdatedByName": {
+        "type": "string",
+        "presence": "16.1%"
+      },
+      "UpdatedById": {
+        "type": "int",
+        "presence": "16.1%"
+      },
+      "OldSubmissionId": {
+        "type": "int",
+        "presence": "40 records archive-wide",
+        "note": "legacy import linkage only"
+      },
+      "ExtraEdition": {
+        "type": "bool",
+        "presence": "never true",
+        "uncertainty": "semantics unverified"
+      },
+      "ExtraEditionDateSent": {
+        "type": "datetime",
+        "presence": "never set"
+      },
+      "IsDeleted": {
+        "type": "bool",
+        "presence": "never true",
+        "note": "server filters deleted rows"
+      },
+      "QuestionForApprover": {
+        "type": "string",
+        "presence": "2.5%",
+        "note": "workflow chatter, not content"
+      },
+      "ReadyForSubmission": {
+        "type": "bool",
+        "presence": "never true"
+      },
+      "RejectComment": {
+        "type": "string",
+        "presence": "never set"
+      },
+      "RejectReasonId": {
+        "type": "string",
+        "presence": "never set"
+      }
+    },
+    "category_object_on_record": [
+      "Id",
+      "Title",
+      "Rank",
+      "Is_Active",
+      "RestrictSubmitting",
+      "Color",
+      "ApprovalProcess"
+    ],
+    "category_object_in_list": [
+      "Id",
+      "Title",
+      "Count",
+      "Rank",
+      "Color",
+      "Selected"
+    ],
+    "fields_not_available_anywhere": [
+      "view/click counts",
+      "expiry date distinct from distribution dates",
+      "attachments collection (images are inlined)",
+      "tags/keywords",
+      "explicit New/Standing flag (derived)"
+    ]
+  },
+  "body_html_characteristics": {
+    "format": "HTML (CKEditor 5 output)",
+    "backend_body_equals_browser_body": true,
+    "fullbody_equals_decoded_submissionbody": {
+      "matches": 1756,
+      "of": 1756
+    },
+    "tag_frequency": {
+      "span": 10873,
+      "p": 10818,
+      "strong": 6808,
+      "li": 3328,
+      "a": 2578,
+      "br": 1782,
+      "u": 1577,
+      "ul": 887,
+      "i": 767,
+      "h4": 165,
+      "h3": 100,
+      "sup": 94,
+      "ol": 84,
+      "h2": 44,
+      "td": 37,
+      "img": 24,
+      "hr": 15,
+      "tr": 13,
+      "figure": 10,
+      "table": 3,
+      "tbody": 3
+    },
+    "attribute_frequency": {
+      "style": 13355,
+      "href": 2578,
+      "target": 2158,
+      "rel": 2158,
+      "class": 217,
+      "src": 24
+    },
+    "links": {
+      "absolute": 2572,
+      "non_absolute": 5,
+      "non_absolute_examples": [
+        "go.rowan.edu/2026researchday",
+        "rowan.edu/scca",
+        "Go.Rowan.edu/EduAdventures",
+        "go.rowan.edu/petpreparedness2026",
+        "file://rowanads.rowan.edu/... (malformed, must be stripped)"
+      ],
+      "note": "non-absolute values are malformed author input, not site-relative paths; trim whitespace and leading &nbsp; and prepend https:// for scheme-less hosts"
+    },
+    "images": {
+      "bodies_with_images": 23,
+      "predominant_form": "data: URI inline base64",
+      "external_https_images": 3,
+      "largest_single_image_bytes": 6119874,
+      "largest_bodies_mb": [
+        5.84,
+        5.59,
+        4.42,
+        4.42,
+        4.42
+      ]
+    },
+    "tables_present": true,
+    "inline_styles_present": true,
+    "bodies_with_inline_style": 942,
+    "unsafe_elements_observed": {
+      "script": 0,
+      "iframe": 0,
+      "form": 0,
+      "object": 0,
+      "embed": 0,
+      "svg": 0,
+      "input": 0,
+      "style": 0,
+      "link": 0,
+      "video": 0,
+      "audio": 0
+    },
+    "sanitisation_required": true,
+    "sanitisation_rationale": "none observed in 1756 bodies, but bodies are author-supplied so must be enforced defensively",
+    "encoding_notes": [
+      "&nbsp; common",
+      "emoji present in titles and bodies",
+      "en/em dashes present",
+      "UTF-8 required end to end"
+    ],
+    "daily_payload_kb": [
+      {
+        "audience": "Employees",
+        "date": "2026-08-20",
+        "records": 13,
+        "json_kb": 3866.0,
+        "data_uri_kb": 1614.2
+      },
+      {
+        "audience": "Students",
+        "date": "2026-08-20",
+        "records": 3,
+        "json_kb": 17.9,
+        "data_uri_kb": 0.0
+      },
+      {
+        "audience": "Employees",
+        "date": "2026-08-21",
+        "records": 13,
+        "json_kb": 86.0,
+        "data_uri_kb": 0.0
+      },
+      {
+        "audience": "Students",
+        "date": "2026-08-21",
+        "records": 8,
+        "json_kb": 57.0,
+        "data_uri_kb": 0.0
+      }
+    ]
+  },
+  "audience_behavior": {
+    "field": "Submission.Audience",
+    "values": [
+      "Employees",
+      "Students",
+      "Both"
+    ],
+    "everyone_equals": "Audience == 'Both'",
+    "server_filter_semantics": "Audience == <requested> OR Audience == 'Both'",
+    "field_predicts_view_membership_exactly": true,
+    "mismatches": 0,
+    "records_checked": 5985,
+    "archive_totals": {
+      "employee_view": 5125,
+      "student_view": 4067,
+      "both": 3207,
+      "employee_only": 1918,
+      "student_only": 860,
+      "union": 5985
+    },
+    "calls_needed_per_day": 2,
+    "single_day_2026_08_20": {
+      "employees": 13,
+      "students": 3,
+      "both": 3,
+      "employee_only": 10,
+      "student_only": 0
+    }
+  },
+  "date_behavior": {
+    "currentdate_honoured": true,
+    "arbitrary_historical_dates": true,
+    "arbitrary_future_dates": true,
+    "invalid_date_silently_falls_back_to_today": true,
+    "single_day_mode": "EndDate == 1900-01-01",
+    "range_mode": "EndDate == real date (inclusive; matches any announcement with >=1 distribution date in range)",
+    "range_totals": {
+      "2026-08-20 single": 13,
+      "2026-08-01..2026-08-31": 141,
+      "2026-01-01..2026-12-31": 1756,
+      "2020-01-01..2030-12-31": 5125
+    },
+    "observed_counts_by_date": [
+      {
+        "date": "2026-08-20",
+        "employees": 13,
+        "students": 3
+      },
+      {
+        "date": "2026-08-21",
+        "employees": 13,
+        "students": 8
+      },
+      {
+        "date": "2026-08-22",
+        "employees": 6,
+        "students": 3
+      },
+      {
+        "date": "2026-08-23",
+        "employees": 3,
+        "students": 3,
+        "note": "Sunday"
+      },
+      {
+        "date": "2025-03-05",
+        "employees": 27,
+        "students": 24
+      },
+      {
+        "date": "1999-01-01",
+        "employees": 0,
+        "students": 0
+      },
+      {
+        "date": "2030-06-15",
+        "employees": 0,
+        "students": 0
+      }
+    ],
+    "explicit_zero_state": {
+      "api": {
+        "TotalCount": "0",
+        "Announcements": [],
+        "Categories": "still fully populated (33)"
+      },
+      "ui_text": "No announcements for Jan 1, 1999 / Please select a different date range."
+    },
+    "timezone_uncertainty": "DistributionDates are bare dates; 'today' must be computed in America/New_York, not UTC"
+  },
+  "announcement_identity": {
+    "primary_key": "SubmissionId",
+    "type": "integer exposed as string",
+    "stable": true,
+    "observed_id_range": [
+      6,
+      6641
+    ],
+    "uniqueness": {
+      "single_day": "13/13 unique",
+      "month_range": "141/141 unique",
+      "full_archive": "5125/5125 unique"
+    },
+    "shared_across_audiences_when_Both": true,
+    "multiple_distribution_dates_per_announcement": true,
+    "distribution_dates_contiguous": false,
+    "same_id_recurs_across_dates": true,
+    "edited_announcement_retains_id": true,
+    "edit_marker": "UpdatedDate / UpdatedByName (set on 283/1756 in 2026)",
+    "other_identifier": {
+      "field": "OldSubmissionId",
+      "nonzero_records": 40,
+      "meaning": "legacy import linkage",
+      "usable_as_key": false
+    },
+    "recommended_daily_grain": "(SubmissionId, distribution_date, audience_view)"
+  },
+  "new_vs_standing_classification": {
+    "rule": "min(DistributionDates) == target_date  =>  New;  else Standing",
+    "requires_history": false,
+    "validated_against": "Rowan-generated Employee email for 2026-08-20",
+    "records_tested": 13,
+    "correct": 13,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "new_on_2026_08_20": [
+      {
+        "SubmissionId": "6572",
+        "title": "Internal Limited Submission: Brain Research Foundation 2027 Seed Grant Program",
+        "first_distribution": "2026-08-20"
+      },
+      {
+        "SubmissionId": "6602",
+        "title": "You Belong Series & Certificate Launch Summit 2026",
+        "first_distribution": "2026-08-20"
+      },
+      {
+        "SubmissionId": "6622",
+        "title": "Parking Lot O-1 Closure",
+        "first_distribution": "2026-08-20"
+      },
+      {
+        "SubmissionId": "6623",
+        "title": "Profs for a Purpose: Mini-Grant Proposals Open",
+        "first_distribution": "2026-08-20"
+      },
+      {
+        "SubmissionId": "6625",
+        "title": "Academic Integrity: Resources and Reminders for Faculty",
+        "first_distribution": "2026-08-20"
+      }
+    ],
+    "implication": "SQLite history becomes a cross-check and change-detector rather than the primary classifier; no cold-start problem"
+  },
+  "category_behavior": {
+    "count": 33,
+    "have_numeric_ids": true,
+    "id_name_mapping_exposed": true,
+    "provided_dynamically_by_backend": true,
+    "returned_in_every_gethomedata_response": true,
+    "zero_count_categories_still_listed": true,
+    "employee_and_student_expose_same_set": true,
+    "varies_by_date": false,
+    "sum_of_counts_equals_totalcount": true,
+    "sum_check_observations": [
+      {
+        "audience": "Employees",
+        "date": "2026-08-20",
+        "listed": 33,
+        "nonzero": 8,
+        "sum": 13,
+        "TotalCount": 13
+      },
+      {
+        "audience": "Students",
+        "date": "2026-08-20",
+        "listed": 33,
+        "nonzero": 3,
+        "sum": 3,
+        "TotalCount": 3
+      },
+      {
+        "audience": "Employees",
+        "date": "2026-08-21",
+        "listed": 33,
+        "nonzero": 9,
+        "sum": 13,
+        "TotalCount": 13
+      },
+      {
+        "audience": "Students",
+        "date": "2026-08-21",
+        "listed": 33,
+        "nonzero": 7,
+        "sum": 8,
+        "TotalCount": 8
+      },
+      {
+        "audience": "Employees",
+        "date": "2025-03-05",
+        "listed": 33,
+        "nonzero": 12,
+        "sum": 27,
+        "TotalCount": 27
+      },
+      {
+        "audience": "Students",
+        "date": "2025-03-05",
+        "listed": 33,
+        "nonzero": 11,
+        "sum": 24,
+        "TotalCount": 24
+      }
+    ],
+    "must_upsert_not_hardcode": true
+  },
+  "category_mappings": {
+    "2": {
+      "title": "Official",
+      "color": "secondary"
+    },
+    "3": {
+      "title": "Public Safety",
+      "color": "orange-darker"
+    },
+    "4": {
+      "title": "Faculty",
+      "color": "yellow-darker"
+    },
+    "5": {
+      "title": "Research",
+      "color": "pink-darker"
+    },
+    "6": {
+      "title": "Union",
+      "color": "blue-darker"
+    },
+    "7": {
+      "title": "Social and Cultural Events",
+      "color": "green-dark"
+    },
+    "8": {
+      "title": "Athletic Events",
+      "color": "indigo-darker"
+    },
+    "9": {
+      "title": "Volunteer Opportunities",
+      "color": "teal-light"
+    },
+    "10": {
+      "title": "Stratford Campus",
+      "color": "yellow-dark"
+    },
+    "11": {
+      "title": "CMSRU",
+      "color": "orange-light"
+    },
+    "12": {
+      "title": "Glassboro Campus",
+      "color": "blue-darkest"
+    },
+    "13": {
+      "title": "Student Government",
+      "color": "green-light"
+    },
+    "14": {
+      "title": "Campus Activities",
+      "color": "violet-darker"
+    },
+    "15": {
+      "title": "Clubs and Organizations",
+      "color": "cyan-light"
+    },
+    "16": {
+      "title": "Our Deepest Condolences",
+      "color": "neutral-10"
+    },
+    "17": {
+      "title": "Library",
+      "color": "grape-darker"
+    },
+    "18": {
+      "title": "Well-being and Health",
+      "color": "teal-dark"
+    },
+    "19": {
+      "title": "Online Events",
+      "color": "cyan-dark"
+    },
+    "20": {
+      "title": "Technology",
+      "color": "blue-dark"
+    },
+    "21": {
+      "title": "Human Resources",
+      "color": "red-light"
+    },
+    "22": {
+      "title": "The Arts & Events",
+      "color": "grape-light"
+    },
+    "23": {
+      "title": "Registrar",
+      "color": "lime-light"
+    },
+    "24": {
+      "title": "Our Stories!",
+      "color": "lime-darkest"
+    },
+    "25": {
+      "title": "Academic and Career Success",
+      "color": "violet"
+    },
+    "26": {
+      "title": "Shreiber School of Veterinary Medicine",
+      "color": "pink-light"
+    },
+    "27": {
+      "title": "Finance",
+      "color": "cyan"
+    },
+    "28": {
+      "title": "Facilities",
+      "color": "lime-light"
+    },
+    "29": {
+      "title": "Academics",
+      "color": "red-dark"
+    },
+    "30": {
+      "title": "Advancement",
+      "color": "red-light"
+    },
+    "31": {
+      "title": "Payroll",
+      "color": "blue-light"
+    },
+    "32": {
+      "title": "Web Services",
+      "color": "teal-dark"
+    },
+    "33": {
+      "title": "Rowan Online",
+      "color": "orange-dark"
+    },
+    "34": {
+      "title": "Rowan On",
+      "color": "orange"
+    }
+  },
+  "observed_submission_ids": {
+    "2026-08-20": {
+      "Employees": [
+        "6476",
+        "6492",
+        "6496",
+        "6529",
+        "6538",
+        "6572",
+        "6578",
+        "6591",
+        "6602",
+        "6606",
+        "6622",
+        "6623",
+        "6625"
+      ],
+      "Students": [
+        "6492",
+        "6622",
+        "6623"
+      ]
+    },
+    "archive_id_range": [
+      6,
+      6641
+    ],
+    "archive_unique_count": 5125
+  },
+  "sample_records": {
+    "_note": "Personal contact values REDACTED. FullBody truncated to 400 chars. Full sanitized fixtures under artifacts/reconnaissance/fixtures/.",
+    "employee_view_2026_08_20": [
+      {
+        "Submission": {
+          "Id": "6623",
+          "SubmittedByName": "[REDACTED]",
+          "SubmittedByDepartment": "Counseling and Psychological Services (S002430)",
+          "SubmittedByJobTitle": "Licensed Professional Counselor",
+          "SubmittedByPhone": "",
+          "SubmittedByEmail": "[REDACTED]",
+          "SubmittedDate": "2026-08-18T19:20:31Z",
+          "SubmittedStatus": "Approved",
+          "Audience": "Both",
+          "Category": 18,
+          "Title": "Profs for a Purpose: Mini-Grant Proposals Open ",
+          "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+          "ExtraEdition": false,
+          "ExtraEditionDateSent": "1900-01-01T00:00:00",
+          "Event": false,
+          "EventName": "",
+          "EventLocation": "",
+          "EventDate": "1900-01-01",
+          "EventStartTime": "00:00:00",
+          "EventEndTime": "00:00:00",
+          "EventNoEnd": false,
+          "ContactName": "[REDACTED]",
+          "ContactDepartment": "Center for Well-Being",
+          "ContactJobTitle": "Assistant Director of Well-Being ",
+          "ContactRowanEmail": "[REDACTED]",
+          "ContactPhone": "[REDACTED]",
+          "QuestionForApprover": "",
+          "ReadyForSubmission": false,
+          "IsDeleted": false,
+          "RejectComment": "",
+          "RejectReasonId": "0",
+          "UpdatedByName": "",
+          "UpdatedDate": "1900-01-01T00:00:00",
+          "ApprovedDate": "2026-08-19T15:23:07Z",
+          "ApprovedByName": "[REDACTED]",
+          "ApprovedByDepartment": "Academic Affairs (S000881)",
+          "ApprovedByJobTitle": "Assistant Vice President for Community Health & Well-Being",
+          "ApprovedByPhone": "",
+          "ApprovedByEmail": "[REDACTED]",
+          "OldSubmissionId": 0
+        },
+        "Category": {
+          "Id": 18,
+          "Title": "Well-being and Health",
+          "Rank": 2,
+          "Is_Active": true,
+          "RestrictSubmitting": false,
+          "Color": "teal-dark",
+          "ApprovalProcess": "Organization"
+        },
+        "DistributionDates": [
+          "2026-08-20",
+          "2026-08-24",
+          "2026-09-01",
+          "2026-09-09"
+        ],
+        "FullBody": "<p style=\"margin-left:0px;\">Applications for Mini-Grants from our Profs for a Purpose: Suicide Prevention Walk are now open! &nbsp;The annual Rowan Profs for a Purpose: Suicide Prevention Walk is an event each April or May that allows our campus community to honor lives lost to suicide and also educate and support our community on suicide prevention and mental health. We also provide resources and...[TRUNCATED]",
+        "ShortBody": "Applications for Mini-Grants from our Profs for a Purpose: Suicide Prevention Walk are now open!  The annual Rowan Profs for a Purpose: Suicide Prevention Walk is an event each April or May that allow"
+      },
+      {
+        "Submission": {
+          "Id": "6602",
+          "SubmittedByName": "[REDACTED]",
+          "SubmittedByDepartment": "Student Access & Pathway Programs (S032836)",
+          "SubmittedByJobTitle": "Administrative Assistant",
+          "SubmittedByPhone": "",
+          "SubmittedByEmail": "[REDACTED]",
+          "SubmittedDate": "2026-08-17T13:08:53Z",
+          "SubmittedStatus": "Approved",
+          "Audience": "Employees",
+          "Category": 18,
+          "Title": "You Belong Series & Certificate Launch Summit 2026",
+          "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+          "ExtraEdition": false,
+          "ExtraEditionDateSent": "1900-01-01T00:00:00",
+          "Event": true,
+          "EventName": "You Belong Summit 2026: Learn It. Practice It. Live It",
+          "EventLocation": "Eynon Ballroom",
+          "EventDate": "2026-11-19",
+          "EventStartTime": "10:00:00",
+          "EventEndTime": "16:00:00",
+          "EventNoEnd": false,
+          "ContactName": "[REDACTED]",
+          "ContactDepartment": "Division of Student Access and Pathway Programs",
+          "ContactJobTitle": "Assistant Vice Chancellor",
+          "ContactRowanEmail": "[REDACTED]",
+          "ContactPhone": "[REDACTED]",
+          "QuestionForApprover": "",
+          "ReadyForSubmission": false,
+          "IsDeleted": false,
+          "RejectComment": "",
+          "RejectReasonId": "0",
+          "UpdatedByName": "",
+          "UpdatedDate": "1900-01-01T00:00:00",
+          "ApprovedDate": "2026-08-17T17:13:41Z",
+          "ApprovedByName": "[REDACTED]",
+          "ApprovedByDepartment": "Academic Affairs (S000881)",
+          "ApprovedByJobTitle": "Assistant Vice President for Community Health & Well-Being",
+          "ApprovedByPhone": "",
+          "ApprovedByEmail": "[REDACTED]",
+          "OldSubmissionId": 0
+        },
+        "Category": {
+          "Id": 18,
+          "Title": "Well-being and Health",
+          "Rank": 2,
+          "Is_Active": true,
+          "RestrictSubmitting": false,
+          "Color": "teal-dark",
+          "ApprovalProcess": "Organization"
+        },
+        "DistributionDates": [
+          "2026-08-20",
+          "2026-08-31",
+          "2026-09-08",
+          "2026-09-16"
+        ],
+        "FullBody": "<p><img class=\"image_resized\" style=\"width:99.7%;\" src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAB78AAAMZCAIAAAD3Hme8AABhUmNhQlgAAGFSanVtYgAAAB5qdW1kYzJwYQARABCAAACqADibcQNjMnBhAAAAYSxqdW1iAAAAR2p1bWRjMm1hABEAEIAAAKoAOJtxA3VybjpjMnBhOjI5OWY4MDdjLWFhYzktNDM1Ny1iMTg0LTg0ZjUzZmMzNzFjZQAAABf1anVtYgAAAClqdW1kYzJhcwARABCAAACqADibcQNjMnBhLmFzc2VydGlvbnMAAAAJ0Wp1bWIAAAA7anVtZEDLDDK7ikidpwsq1vR/Q2kTYz...[TRUNCATED]",
+        "ShortBody": " At Rowan, our strength lies in bringing different voices together. We are committed to building a campus culture where everyone feels truly seen, heard, and valued.\r\n We invite you to the You Belong "
+      },
+      {
+        "Submission": {
+          "Id": "6622",
+          "SubmittedByName": "[REDACTED]",
+          "SubmittedByDepartment": "Department of Public Safety (S001627)",
+          "SubmittedByJobTitle": "Public Safety  Administrator",
+          "SubmittedByPhone": "[REDACTED]",
+          "SubmittedByEmail": "[REDACTED]",
+          "SubmittedDate": "2026-08-18T17:50:49Z",
+          "SubmittedStatus": "Approved",
+          "Audience": "Both",
+          "Category": 3,
+          "Title": " Parking Lot O-1  Closure",
+          "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+          "ExtraEdition": false,
+          "ExtraEditionDateSent": "1900-01-01T00:00:00",
+          "Event": false,
+          "EventName": "",
+          "EventLocation": "",
+          "EventDate": "1900-01-01",
+          "EventStartTime": "00:00:00",
+          "EventEndTime": "00:00:00",
+          "EventNoEnd": false,
+          "ContactName": "",
+          "ContactDepartment": "Parking Office",
+          "ContactJobTitle": "",
+          "ContactRowanEmail": "[REDACTED]",
+          "ContactPhone": "[REDACTED]",
+          "QuestionForApprover": "",
+          "ReadyForSubmission": false,
+          "IsDeleted": false,
+          "RejectComment": "",
+          "RejectReasonId": "0",
+          "UpdatedByName": "",
+          "UpdatedDate": "1900-01-01T00:00:00",
+          "ApprovedDate": "2026-08-18T17:50:59Z",
+          "ApprovedByName": "[REDACTED]",
+          "ApprovedByDepartment": "Department of Public Safety (S001627)",
+          "ApprovedByJobTitle": "Public Safety  Administrator",
+          "ApprovedByPhone": "[REDACTED]",
+          "ApprovedByEmail": "[REDACTED]",
+          "OldSubmissionId": 0
+        },
+        "Category": {
+          "Id": 3,
+          "Title": "Public Safety",
+          "Rank": 3,
+          "Is_Active": true,
+          "RestrictSubmitting": false,
+          "Color": "orange-darker",
+          "ApprovalProcess": "Organization"
+        },
+        "DistributionDates": [
+          "2026-08-20",
+          "2026-08-21",
+          "2026-08-23"
+        ],
+        "FullBody": "<p>Parking Lot O-1 will be closed on Wednesday, August 19, 2026 at 10 pm. &nbsp;The lot will remain closed until Monday, August 24, 2026. &nbsp;</p>",
+        "ShortBody": "Parking Lot O-1 will be closed on Wednesday, August 19, 2026 at 10 pm.  The lot will remain closed until Monday, August 24, 2026."
+      }
+    ],
+    "student_view_2026_08_20": [
+      {
+        "Submission": {
+          "Id": "6623",
+          "SubmittedByName": "[REDACTED]",
+          "SubmittedByDepartment": "Counseling and Psychological Services (S002430)",
+          "SubmittedByJobTitle": "Licensed Professional Counselor",
+          "SubmittedByPhone": "",
+          "SubmittedByEmail": "[REDACTED]",
+          "SubmittedDate": "2026-08-18T19:20:31Z",
+          "SubmittedStatus": "Approved",
+          "Audience": "Both",
+          "Category": 18,
+          "Title": "Profs for a Purpose: Mini-Grant Proposals Open ",
+          "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+          "ExtraEdition": false,
+          "ExtraEditionDateSent": "1900-01-01T00:00:00",
+          "Event": false,
+          "EventName": "",
+          "EventLocation": "",
+          "EventDate": "1900-01-01",
+          "EventStartTime": "00:00:00",
+          "EventEndTime": "00:00:00",
+          "EventNoEnd": false,
+          "ContactName": "[REDACTED]",
+          "ContactDepartment": "Center for Well-Being",
+          "ContactJobTitle": "Assistant Director of Well-Being ",
+          "ContactRowanEmail": "[REDACTED]",
+          "ContactPhone": "[REDACTED]",
+          "QuestionForApprover": "",
+          "ReadyForSubmission": false,
+          "IsDeleted": false,
+          "RejectComment": "",
+          "RejectReasonId": "0",
+          "UpdatedByName": "",
+          "UpdatedDate": "1900-01-01T00:00:00",
+          "ApprovedDate": "2026-08-19T15:23:07Z",
+          "ApprovedByName": "[REDACTED]",
+          "ApprovedByDepartment": "Academic Affairs (S000881)",
+          "ApprovedByJobTitle": "Assistant Vice President for Community Health & Well-Being",
+          "ApprovedByPhone": "",
+          "ApprovedByEmail": "[REDACTED]",
+          "OldSubmissionId": 0
+        },
+        "Category": {
+          "Id": 18,
+          "Title": "Well-being and Health",
+          "Rank": 2,
+          "Is_Active": true,
+          "RestrictSubmitting": false,
+          "Color": "teal-dark",
+          "ApprovalProcess": "Organization"
+        },
+        "DistributionDates": [
+          "2026-08-20",
+          "2026-08-24",
+          "2026-09-01",
+          "2026-09-09"
+        ],
+        "FullBody": "<p style=\"margin-left:0px;\">Applications for Mini-Grants from our Profs for a Purpose: Suicide Prevention Walk are now open! &nbsp;The annual Rowan Profs for a Purpose: Suicide Prevention Walk is an event each April or May that allows our campus community to honor lives lost to suicide and also educate and support our community on suicide prevention and mental health. We also provide resources and...[TRUNCATED]",
+        "ShortBody": "Applications for Mini-Grants from our Profs for a Purpose: Suicide Prevention Walk are now open!  The annual Rowan Profs for a Purpose: Suicide Prevention Walk is an event each April or May that allow"
+      },
+      {
+        "Submission": {
+          "Id": "6622",
+          "SubmittedByName": "[REDACTED]",
+          "SubmittedByDepartment": "Department of Public Safety (S001627)",
+          "SubmittedByJobTitle": "Public Safety  Administrator",
+          "SubmittedByPhone": "[REDACTED]",
+          "SubmittedByEmail": "[REDACTED]",
+          "SubmittedDate": "2026-08-18T17:50:49Z",
+          "SubmittedStatus": "Approved",
+          "Audience": "Both",
+          "Category": 3,
+          "Title": " Parking Lot O-1  Closure",
+          "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+          "ExtraEdition": false,
+          "ExtraEditionDateSent": "1900-01-01T00:00:00",
+          "Event": false,
+          "EventName": "",
+          "EventLocation": "",
+          "EventDate": "1900-01-01",
+          "EventStartTime": "00:00:00",
+          "EventEndTime": "00:00:00",
+          "EventNoEnd": false,
+          "ContactName": "",
+          "ContactDepartment": "Parking Office",
+          "ContactJobTitle": "",
+          "ContactRowanEmail": "[REDACTED]",
+          "ContactPhone": "[REDACTED]",
+          "QuestionForApprover": "",
+          "ReadyForSubmission": false,
+          "IsDeleted": false,
+          "RejectComment": "",
+          "RejectReasonId": "0",
+          "UpdatedByName": "",
+          "UpdatedDate": "1900-01-01T00:00:00",
+          "ApprovedDate": "2026-08-18T17:50:59Z",
+          "ApprovedByName": "[REDACTED]",
+          "ApprovedByDepartment": "Department of Public Safety (S001627)",
+          "ApprovedByJobTitle": "Public Safety  Administrator",
+          "ApprovedByPhone": "[REDACTED]",
+          "ApprovedByEmail": "[REDACTED]",
+          "OldSubmissionId": 0
+        },
+        "Category": {
+          "Id": 3,
+          "Title": "Public Safety",
+          "Rank": 3,
+          "Is_Active": true,
+          "RestrictSubmitting": false,
+          "Color": "orange-darker",
+          "ApprovalProcess": "Organization"
+        },
+        "DistributionDates": [
+          "2026-08-20",
+          "2026-08-21",
+          "2026-08-23"
+        ],
+        "FullBody": "<p>Parking Lot O-1 will be closed on Wednesday, August 19, 2026 at 10 pm. &nbsp;The lot will remain closed until Monday, August 24, 2026. &nbsp;</p>",
+        "ShortBody": "Parking Lot O-1 will be closed on Wednesday, August 19, 2026 at 10 pm.  The lot will remain closed until Monday, August 24, 2026."
+      },
+      {
+        "Submission": {
+          "Id": "6492",
+          "SubmittedByName": "[REDACTED]",
+          "SubmittedByDepartment": "Intensive English Language Programs (S001926)",
+          "SubmittedByJobTitle": "Assistant Director, IELP",
+          "SubmittedByPhone": "",
+          "SubmittedByEmail": "[REDACTED]",
+          "SubmittedDate": "2026-08-03T16:07:01Z",
+          "SubmittedStatus": "Approved",
+          "Audience": "Both",
+          "Category": 25,
+          "Title": "English Language Program - Camden and Glassboro - Classes Start Sept 1!",
+          "SubmissionBody": "[REDACTED_BASE64_DUPLICATE_OF_FullBody]",
+          "ExtraEdition": false,
+          "ExtraEditionDateSent": "1900-01-01T00:00:00",
+          "Event": false,
+          "EventName": "",
+          "EventLocation": "",
+          "EventDate": "1900-01-01",
+          "EventStartTime": "00:00:00",
+          "EventEndTime": "00:00:00",
+          "EventNoEnd": false,
+          "ContactName": "[REDACTED]",
+          "ContactDepartment": "ELP - English Language Programs Rowan University",
+          "ContactJobTitle": "Assistant Director, English Language Program",
+          "ContactRowanEmail": "[REDACTED]",
+          "ContactPhone": "[REDACTED]",
+          "QuestionForApprover": "",
+          "ReadyForSubmission": false,
+          "IsDeleted": false,
+          "RejectComment": "",
+          "RejectReasonId": "0",
+          "UpdatedByName": "",
+          "UpdatedDate": "1900-01-01T00:00:00",
+          "ApprovedDate": "2026-08-03T16:50:45Z",
+          "ApprovedByName": "[REDACTED]",
+          "ApprovedByDepartment": "Academic Affairs (S000881)",
+          "ApprovedByJobTitle": "Vice President",
+          "ApprovedByPhone": "[REDACTED]",
+          "ApprovedByEmail": "[REDACTED]",
+          "OldSubmissionId": 0
+        },
+        "Category": {
+          "Id": 25,
+          "Title": "Academic and Career Success",
+          "Rank": 24,
+          "Is_Active": true,
+          "RestrictSubmitting": false,
+          "Color": "violet",
+          "ApprovalProcess": "Organization"
+        },
+        "DistributionDates": [
+          "2026-08-06",
+          "2026-08-12",
+          "2026-08-20",
+          "2026-08-28"
+        ],
+        "FullBody": "<p>The English Language Program (ELP) at Rowan University is back on our Camden Campus and will maintain classes on our Glassboro Campus starting <strong>September 1</strong>!</p><p>These classes are <strong><u>open to anyone </u></strong>who is a multilingual (ESL) learner and wants to improve their language skills for academic or personal growth. We offer 5 Levels and accept all levels of profic...[TRUNCATED]",
+        "ShortBody": "The English Language Program (ELP) at Rowan University is back on our Camden Campus and will maintain classes on our Glassboro Campus starting September 1 !\r\nThese classes are open to anyone who is a "
+      }
+    ]
+  },
+  "recommended_collector": {
+    "choice": "A - direct structured backend/API calls",
+    "with_optional_element_of": "D - hybrid; a weekly (non-critical-path) Playwright cross-check of TotalCount and category chips",
+    "rejected": {
+      "B_html_parsing": "impossible - index HTML is a 2.3 KB React shell with no announcement data",
+      "C_playwright_dom": "demonstrated silent data loss: 20 of 27 announcements rendered on 2025-03-05; also slower, more fragile, and returns FEWER fields (no DistributionDates, no approver metadata)",
+      "claude_vision_or_nl_browsing": "explicitly not recommended as primary collector; deterministic extraction is fully available"
+    },
+    "daily_plan": "2 POSTs to ActionGetHomeData (Employees + Students), single-day mode, MaxRecords=500, runtime token discovery, pinned TLS bundle",
+    "detail_pages_needed": false,
+    "detail_page_avoidance_benefit": "avoids triggering Rowan's ActionSaveVisitorClicks write"
+  },
+  "required_validation_rules": [
+    {
+      "id": "V1",
+      "name": "structural validity gate",
+      "severity": "fatal",
+      "assert": [
+        "http_status == 200",
+        "content_type is json",
+        "'exception' not in response",
+        "versionInfo.hasApiVersionChanged == false",
+        "'Categories' in data and len(Categories) > 0",
+        "'TotalCount' in data and parses as int >= 0",
+        "'Announcements' in data"
+      ],
+      "rationale": "a genuine empty day returns a FULL 33-entry Categories list; a broken call returns data:{}. This is what distinguishes 'no announcements' from 'collector failed'."
+    },
+    {
+      "id": "V2",
+      "name": "count reconciliation",
+      "severity": "fatal",
+      "assert": [
+        "len(Announcements) == int(TotalCount)",
+        "sum(int(c.Count) for c in Categories) == int(TotalCount)"
+      ]
+    },
+    {
+      "id": "V3",
+      "name": "truncation suspicion",
+      "severity": "fatal",
+      "assert": [
+        "len(Announcements) < MaxRecords"
+      ],
+      "action": "if equal, re-query with larger MaxRecords or paginate even if counts agree"
+    },
+    {
+      "id": "V4",
+      "name": "audience echo",
+      "severity": "fatal",
+      "assert": [
+        "requested Audience in ('Employees','Students')",
+        "every record.Audience in (requested, 'Both')"
+      ],
+      "rationale": "an invalid Audience silently returns only the 'Both' subset instead of erroring"
+    },
+    {
+      "id": "V5",
+      "name": "date echo",
+      "severity": "fatal",
+      "assert": [
+        "requested date is parseable YYYY-MM-DD before sending",
+        "target_date in record.DistributionDates for every record"
+      ],
+      "rationale": "an unparseable CurrentDate silently falls back to today"
+    },
+    {
+      "id": "V6",
+      "name": "identity integrity",
+      "severity": "fatal",
+      "assert": [
+        "SubmissionIds unique within a single-day result",
+        "SubmissionId is a positive integer"
+      ]
+    },
+    {
+      "id": "V7",
+      "name": "required fields",
+      "severity": "fatal per record",
+      "assert": [
+        "Id",
+        "Title non-empty after trim",
+        "Audience in enum",
+        "Category resolvable in Categories",
+        "FullBody non-empty",
+        "DistributionDates non-empty",
+        "SubmittedStatus == 'Approved'"
+      ]
+    },
+    {
+      "id": "V8",
+      "name": "required fields soft",
+      "severity": "warn",
+      "assert": [
+        "ContactRowanEmail non-empty",
+        "if Event then EventName non-empty and EventDate != '1900-01-01'"
+      ]
+    },
+    {
+      "id": "V9",
+      "name": "employee/student parity",
+      "severity": "fatal",
+      "assert": [
+        "audience class from Audience field == audience class from set membership across the two calls",
+        "len(Both) == len(employee_set & student_set)"
+      ]
+    },
+    {
+      "id": "V10",
+      "name": "change detection",
+      "severity": "info",
+      "assert": [
+        "hash(Title, FullBody, Category, Audience, Event*, Contact*, DistributionDates) compared to stored",
+        "prefer native UpdatedDate/UpdatedByName signal",
+        "flag hash change with no UpdatedDate change as suspicious"
+      ]
+    },
+    {
+      "id": "V11",
+      "name": "trend guard",
+      "severity": "warn",
+      "assert": [
+        "not (today == 0 and trailing 14 days all non-zero)",
+        "no implausible swing in totals or category counts"
+      ],
+      "note": "weekends legitimately drop (2026-08-23 Sunday had 3)"
+    },
+    {
+      "id": "V12",
+      "name": "transport validation",
+      "severity": "fatal",
+      "assert": [
+        "TLS verification succeeds against pinned InCommon bundle"
+      ],
+      "note": "report TLS failure distinctly from HTTP failure"
+    },
+    {
+      "id": "V13",
+      "name": "token drift",
+      "severity": "warn",
+      "assert": [
+        "log discovered token set each run",
+        "alert when apiVersion changes"
+      ]
+    }
+  ],
+  "unresolved_questions": [
+    {
+      "id": "U1",
+      "q": "How often do apiVersion/moduleVersion rotate?",
+      "impact": "silent empty result if unchecked",
+      "mitigation": "V1 gate + runtime re-discovery and retry-once"
+    },
+    {
+      "id": "U2",
+      "q": "Is there a server-side MaxRecords cap?",
+      "impact": "silent truncation",
+      "mitigation": "V2/V3 reconciliation"
+    },
+    {
+      "id": "U3",
+      "q": "ExtraEdition semantics - does a special edition appear in ActionGetHomeData?",
+      "impact": "could miss a whole class of announcement",
+      "observed": "false for all 5125 records"
+    },
+    {
+      "id": "U4",
+      "q": "Should Rowan IT be notified about the PII exposure in the API response?",
+      "impact": "policy/ethics decision for the user, not acted upon"
+    },
+    {
+      "id": "U5",
+      "q": "Timezone boundary behaviour for 'today'",
+      "impact": "wrong date near midnight",
+      "mitigation": "use America/New_York"
+    },
+    {
+      "id": "U6",
+      "q": "Can Audience be edited after publication?",
+      "impact": "Everyone classification could change between runs"
+    },
+    {
+      "id": "U7",
+      "q": "Meaning of rolesInfo ',' in every response",
+      "impact": "none known"
+    },
+    {
+      "id": "U8",
+      "q": "Weekend/holiday cadence not fully characterised",
+      "impact": "tuning the suspicious-zero alert"
+    },
+    {
+      "id": "U9",
+      "q": "ShortBody truncation rule",
+      "impact": "none if we always use FullBody"
+    },
+    {
+      "id": "U10",
+      "q": "Rate-limit thresholds",
+      "impact": "minimal at 2 requests/day; never triggered during recon"
+    }
+  ]
+}
