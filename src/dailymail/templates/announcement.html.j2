@@ -1,0 +1,68 @@
+{#- One announcement card. Included from email.html.j2 with `item` in scope. -#}
+  <tr><td style="padding:12px 20px 14px 20px;border-bottom:1px solid #e6e6e6;" class="pad">
+
+    {#- badge + category row -#}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      {#- Badge cells carry an explicit line-height. Without it they inherit the
+          collapsed line-height used to kill inline-block whitespace and the
+          glyphs get clipped by their own background box. -#}
+      <td class="stack" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:10px;line-height:18px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-block;"><tr>
+          {%- if item.status == 'New' %}
+          <td style="background:#57150B;padding:3px 8px 4px 8px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:10px;line-height:12px;font-weight:bold;color:#ffffff;letter-spacing:1px;white-space:nowrap;">NEW</td>
+          {%- else %}
+          <td style="background:#efefef;border:1px solid #d5d5d5;padding:2px 7px 3px 7px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:10px;line-height:12px;font-weight:bold;color:#555555;letter-spacing:1px;white-space:nowrap;">STANDING</td>
+          {%- endif %}
+          {%- if item.changed %}
+          <td style="width:6px;font-size:10px;line-height:12px;">&nbsp;</td>
+          <td style="background:#FFCC00;padding:3px 8px 4px 8px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:10px;line-height:12px;font-weight:bold;color:#3d2600;letter-spacing:1px;white-space:nowrap;">UPDATED</td>
+          {%- endif %}
+          <td style="width:6px;font-size:10px;line-height:12px;">&nbsp;</td>
+          <td style="background:#ffffff;border:1px solid #b9b9b9;padding:2px 7px 3px 7px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:10px;line-height:12px;font-weight:bold;color:#444444;letter-spacing:1px;white-space:nowrap;">{{ item.audience_label }}</td>
+        </tr></table>
+      </td>
+      <td class="stack cat-right" align="right" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;color:#6b6b6b;white-space:nowrap;padding-left:8px;">
+        {{ item.category_title }}
+      </td>
+    </tr></table>
+
+    {#- subject: the primary link -#}
+    <div style="padding:6px 0 2px 0;">
+      <a class="subject-link" href="{{ item.official_url }}" target="_blank" rel="noopener noreferrer"
+         style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:18px;line-height:1.28;font-weight:bold;color:#57150B;text-decoration:none;word-break:break-word;">{{ item.title }}</a>
+    </div>
+
+    {#- event block -#}
+    {%- if item.event %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 4px 0;">
+      <tr><td style="background:#fbf7e6;border-left:3px solid #FFCC00;padding:7px 10px;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;color:#3d2600;line-height:1.45;">
+        {%- if item.event.name %}<strong>{{ item.event.name }}</strong><br>{% endif %}
+        {%- if item.event.when %}{{ item.event.when }}{% endif %}
+        {%- if item.event.location %}{% if item.event.when %} &middot; {% endif %}{{ item.event.location }}{% endif %}
+      </td></tr>
+    </table>
+    {%- endif %}
+
+    {#- complete announcement body, sanitized -#}
+    <div class="body-copy" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:15px;line-height:1.52;color:#1a1a1a;padding:6px 0 2px 0;">
+      {{ item.body_html }}
+    </div>
+
+    {#- source metadata -#}
+    {%- if item.meta_lines %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0 0;">
+      <tr><td style="border-top:1px solid #ededed;padding:7px 0 0 0;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:12px;color:#5c5c5c;line-height:1.55;word-break:break-word;">
+        {%- for line in item.meta_lines %}
+        <div><span style="color:#8a8a8a;">{{ line.label }}</span>&nbsp; {{ line.value }}</div>
+        {%- endfor %}
+      </td></tr>
+    </table>
+    {%- endif %}
+
+    {#- official link, large tap target -#}
+    <div style="padding:9px 0 0 0;">
+      <a href="{{ item.official_url }}" target="_blank" rel="noopener noreferrer"
+         style="display:inline-block;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:#57150B;text-decoration:none;border:1px solid #cfcfcf;padding:8px 12px;letter-spacing:0.3px;">View official announcement &rsaquo;</a>
+    </div>
+
+  </td></tr>

@@ -41,14 +41,103 @@ MOCK_CSRF = "MOCKcsrfToken00000000="
 
 @pytest.fixture(autouse=True)
 def isolated_state_dir(tmp_path, monkeypatch):
-    """Point XDG_STATE_HOME at a temp dir for every test.
+    """Redirect every XDG location into a temp dir for every test.
 
-    Without this, tests would read the developer's real collection history and
-    the prior-run token comparison would make results depend on whatever live
-    runs happened to be on the machine.
+    Without this, tests would read the developer's real database, collection
+    history and credentials, and results would depend on whatever live runs
+    happened to have occurred on the machine.
     """
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     return tmp_path / "state"
+
+
+@pytest.fixture
+def fake_credentials(tmp_path, monkeypatch):
+    """A throwaway credential file with correct permissions.
+
+    The password is deliberately distinctive so tests can assert it never
+    reaches a message, a log line, or the curation payload.
+    """
+    from dailymail import settings as settings_module
+
+    directory = settings_module.config_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    directory.chmod(0o700)
+    path = directory / "credentials.env"
+    path.write_text(
+        "GMAIL_SMTP_USER=digest-test@gmail.com\n"
+        "GMAIL_APP_PASSWORD=abcd efgh ijkl mnop\n",
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+    return path
+
+
+@pytest.fixture
+def settings_obj(fake_credentials):
+    from dailymail import settings as settings_module
+
+    settings_module.ensure_config()
+    return settings_module.load()
+
+
+@pytest.fixture
+def populated_db(settings_obj, employee_fixture, student_fixture):
+    """Database seeded from the sanitized Phase 0 fixtures for both dates."""
+    from dailymail import db, ingest
+
+    connection = db.connect()
+    db.initialize(connection)
+    artifact = _artifact_from_fixtures(employee_fixture, student_fixture, TARGET_DATE)
+    ingest.ingest_artifact(connection, artifact, settings_obj, origin="test")
+    yield connection
+    connection.close()
+
+
+def _artifact_from_fixtures(employee_fixture, student_fixture, target_date):
+    """Build a Phase 1 shaped collection artifact from the two view fixtures."""
+    membership: dict[str, list[str]] = {}
+    records: dict[str, dict] = {}
+    for view, fixture in (("Employees", employee_fixture), ("Students", student_fixture)):
+        for raw in fixture["Announcements"]:
+            submission_id = str(raw["Submission"]["Id"])
+            membership.setdefault(submission_id, []).append(view)
+            records.setdefault(submission_id, raw)
+
+    from dailymail.normalize import normalize_category_registry, normalize_record
+
+    announcements = [
+        normalize_record(
+            raw, target_date=target_date,
+            source_query_membership=membership[submission_id],
+        )
+        for submission_id, raw in sorted(records.items(), key=lambda kv: int(kv[0]))
+    ]
+    registry = normalize_category_registry(employee_fixture["Categories"])
+    return {
+        "schema_version": 1,
+        "target_date": target_date,
+        "generated_at_utc": "2026-08-21T12:00:00+00:00",
+        "counts": {
+            "unique": len(announcements),
+            "new": sum(1 for a in announcements if a["status"] == "New"),
+            "standing": sum(1 for a in announcements if a["status"] == "Standing"),
+            "categories": len(registry),
+        },
+        "source_counts": {
+            "employees_total_count": len(employee_fixture["Announcements"]),
+            "students_total_count": len(student_fixture["Announcements"]),
+        },
+        "category_registry": registry,
+        "announcements": announcements,
+        "validation": {"passed": ["test"], "warnings": [], "warning_count": 0},
+    }
+
+
+def artifact_from_fixtures(employee_fixture, student_fixture, target_date=TARGET_DATE):
+    return _artifact_from_fixtures(employee_fixture, student_fixture, target_date)
 
 
 def load_fixture(name: str) -> dict:

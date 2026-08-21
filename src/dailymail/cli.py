@@ -1,21 +1,41 @@
 """Command line interface.
 
-    uv run dailymail collect
-    uv run dailymail collect --date 2026-08-20
-    uv run dailymail inspect --date 2026-08-20
+    uv run dailymail run-daily                      # the production pipeline
+    uv run dailymail run-daily --date 2026-08-20
+    uv run dailymail run-daily --force-resend
+    uv run dailymail collect                        # collect only
+    uv run dailymail inspect --date 2026-08-20      # inspect a collection
+    uv run dailymail render --date 2026-08-20       # render without sending
+    uv run dailymail send --date 2026-08-20         # send an already-stored day
+    uv run dailymail status                         # recent runs and deliveries
+    uv run dailymail db-status                      # database statistics
+    uv run dailymail db-init                        # create/import history
+    uv run dailymail install-timer                  # systemd service + timer
 
-Success is one concise line. Announcement bodies are never printed.
-Any failure exits non-zero with a distinct code (see `errors.py`).
+Success is one concise line. Announcement bodies are never printed, and no
+credential is ever logged. Any failure exits non-zero with a distinct code
+(see `errors.py`).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 
 from . import collect, config
 from .errors import DailyMailError, UsageError
+
+
+def _setup_logging(verbose: bool = False) -> None:
+    """Concise structured lines for the systemd journal."""
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(levelname)s %(name)s %(message)s",
+        stream=sys.stderr,
+        force=True,
+    )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -47,6 +67,57 @@ def _build_parser() -> argparse.ArgumentParser:
     inspect_parser.add_argument(
         "--date", metavar="YYYY-MM-DD", required=True, help="Date to inspect."
     )
+
+    daily = subparsers.add_parser(
+        "run-daily", help="Full production pipeline: collect, persist, curate, send."
+    )
+    daily.add_argument("--date", metavar="YYYY-MM-DD", default=None,
+                       help="Digest date. Defaults to today in the configured timezone.")
+    daily.add_argument("--force-resend", action="store_true",
+                       help="Send even if this date was already delivered.")
+    daily.add_argument("--dry-run", action="store_true",
+                       help="Render and validate, but do not send.")
+    daily.add_argument("--trigger", default="manual",
+                       help="Recorded in the runs table (e.g. 'timer').")
+    daily.add_argument("-v", "--verbose", action="store_true")
+
+    render_parser = subparsers.add_parser(
+        "render", help="Render a stored date to HTML and text without sending."
+    )
+    render_parser.add_argument("--date", metavar="YYYY-MM-DD", required=True)
+    render_parser.add_argument("--out", metavar="DIR", default=None,
+                               help="Directory for the .html/.txt preview "
+                                    "(default: the diagnostics directory).")
+    render_parser.add_argument("--inline-images", action="store_true",
+                               help="Inline CID images as data URIs so the preview "
+                                    "can be opened directly in a browser.")
+
+    send_parser = subparsers.add_parser(
+        "send", help="Send the digest for an already-collected date."
+    )
+    send_parser.add_argument("--date", metavar="YYYY-MM-DD", required=True)
+    send_parser.add_argument("--force-resend", action="store_true")
+    send_parser.add_argument("-v", "--verbose", action="store_true")
+
+    status_parser = subparsers.add_parser("status", help="Recent runs and deliveries.")
+    status_parser.add_argument("--limit", type=int, default=10)
+
+    subparsers.add_parser("db-status", help="Database statistics.")
+
+    init_parser = subparsers.add_parser(
+        "db-init", help="Create the database and import existing collection artifacts."
+    )
+    init_parser.add_argument("--no-import", action="store_true",
+                             help="Create the schema without importing artifacts.")
+
+    timer_parser = subparsers.add_parser(
+        "install-timer", help="Install and enable the systemd user service and timer."
+    )
+    timer_parser.add_argument("--no-enable", action="store_true",
+                              help="Write the units without enabling the timer.")
+    timer_parser.add_argument("--print-only", action="store_true",
+                              help="Show the units without writing them.")
+
     return parser
 
 
@@ -146,6 +217,440 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- production pipeline -----------------------------------------------------
+
+
+def _open_db():
+    from . import db
+
+    connection = db.connect()
+    db.initialize(connection)
+    return connection
+
+
+def _cmd_run_daily(args: argparse.Namespace) -> int:
+    from . import daily, settings as settings_module
+
+    _setup_logging(getattr(args, "verbose", False))
+    settings_module.ensure_config()
+    settings = settings_module.load()
+    target = collect.parse_target_date(args.date) if args.date else None
+
+    result = daily.run_daily(
+        target_date=target,
+        settings=settings,
+        force_resend=args.force_resend,
+        dry_run=args.dry_run,
+        trigger=args.trigger,
+    )
+
+    counts = result.counts or {}
+    print(
+        f"RUN {result.status.upper()} date={result.target_date} "
+        f"employees={counts.get('employee_view', 0)} "
+        f"students={counts.get('student_view', 0)} "
+        f"unique={counts.get('unique', 0)} new={counts.get('new', 0)} "
+        f"standing={counts.get('standing', 0)} updated={counts.get('changed', 0)}"
+    )
+    print(
+        f"  audience: everyone={counts.get('everyone', 0)} "
+        f"employee_only={counts.get('employee_only', 0)} "
+        f"student_only={counts.get('student_only', 0)}"
+    )
+    print(
+        f"  curation: {result.curation_method} "
+        f"model={result.curation_model or '-'} {result.curation_seconds or 0}s"
+        + (f" ({result.curation_error})" if result.curation_error else "")
+    )
+    images = result.image_stats or {}
+    if images.get("seen"):
+        print(
+            f"  images: seen={images['seen']} embedded={images['embedded']} "
+            f"omitted={images['omitted']} "
+            f"{images['original_bytes'] // 1024}KB -> {images['final_bytes'] // 1024}KB"
+        )
+    print(
+        f"  email: {result.email_status}"
+        + (f" size={result.message_bytes}B" if result.message_bytes else "")
+        + (f" id={result.message_id}" if result.message_id else "")
+    )
+    if result.maintenance:
+        maint = result.maintenance
+        print(
+            f"  maintenance: backup={'ok' if maint.get('backup') else 'FAILED'} "
+            f"db={maint.get('database_bytes', 0) // 1024}KB "
+            f"pruned(backups={maint.get('backups_pruned', 0)},"
+            f"diag={maint.get('diagnostics_pruned', 0)},"
+            f"artifacts={maint.get('artifacts_pruned', 0)})"
+        )
+    if result.status != "success":
+        print(f"  error: {result.error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_render(args: argparse.Namespace) -> int:
+    import base64
+    from pathlib import Path
+
+    from . import curate, db, maintenance, render, settings as settings_module
+
+    settings_module.ensure_config()
+    settings = settings_module.load()
+    target = collect.parse_target_date(args.date)
+
+    connection = _open_db()
+    try:
+        rows = db.digest_rows(connection, target)
+        if not rows:
+            raise UsageError(
+                f"no stored announcements for {target}. "
+                f"Run: uv run dailymail run-daily --date {target}"
+            )
+        counts = db.counts_for_date(connection, target)
+        stored = list(
+            connection.execute(
+                "SELECT submission_id, section, final_rank, method FROM "
+                "curation_results WHERE target_date = ?",
+                (target,),
+            )
+        )
+        if stored:
+            ordering = {
+                str(row["submission_id"]): {"model_rank": row["final_rank"]}
+                for row in stored
+            }
+            method = stored[0]["method"]
+        else:
+            entries = curate.fallback_rank(rows, target, settings)
+            ordering = {entry["submission_id"]: entry for entry in entries}
+            method = "fallback"
+
+        digest = render.render_digest(
+            rows, target_date=target, counts=counts, ordering=ordering,
+            curation_method=method, settings=settings,
+        )
+    finally:
+        connection.close()
+
+    html = digest.html
+    if args.inline_images:
+        for image in digest.images:
+            html = html.replace(
+                f"cid:{image.cid}",
+                "data:%s;base64,%s"
+                % (image.content_type, base64.b64encode(image.data).decode()),
+            )
+
+    if args.out:
+        directory = Path(args.out)
+        directory.mkdir(parents=True, exist_ok=True)
+        html_path = directory / f"{target}.html"
+        text_path = directory / f"{target}.txt"
+        html_path.write_text(html, encoding="utf-8")
+        text_path.write_text(digest.text, encoding="utf-8")
+    else:
+        html_path = maintenance.save_diagnostic(f"{target}-preview.html", html)
+        text_path = maintenance.save_diagnostic(f"{target}-preview.txt", digest.text)
+
+    print(
+        f"RENDER OK date={target} announcements={len(digest.submission_ids)} "
+        f"html={len(html) // 1024}KB text={len(digest.text) // 1024}KB "
+        f"images={digest.image_stats['embedded']}/{digest.image_stats['seen']} "
+        f"ordering={method}"
+    )
+    print(f"  subject: {digest.subject}")
+    print(f"  {html_path}")
+    print(f"  {text_path}")
+    return 0
+
+
+def _cmd_send(args: argparse.Namespace) -> int:
+    """Send a date that is already collected and stored."""
+    from . import daily, settings as settings_module
+
+    _setup_logging(getattr(args, "verbose", False))
+    settings_module.ensure_config()
+    settings = settings_module.load()
+    target = collect.parse_target_date(args.date)
+
+    from . import curate, db, mailer, render
+
+    connection = _open_db()
+    try:
+        rows = db.digest_rows(connection, target)
+        if not rows:
+            raise UsageError(
+                f"no stored announcements for {target}. "
+                f"Run: uv run dailymail run-daily --date {target}"
+            )
+        counts = db.counts_for_date(connection, target)
+        stored = list(
+            connection.execute(
+                "SELECT submission_id, final_rank, method FROM curation_results "
+                "WHERE target_date = ?",
+                (target,),
+            )
+        )
+        if stored:
+            ordering = {
+                str(r["submission_id"]): {"model_rank": r["final_rank"]} for r in stored
+            }
+            method = stored[0]["method"]
+        else:
+            entries = curate.fallback_rank(rows, target, settings)
+            ordering = {e["submission_id"]: e for e in entries}
+            method = "fallback"
+
+        digest = render.render_digest(
+            rows, target_date=target, counts=counts, ordering=ordering,
+            curation_method=method, settings=settings,
+        )
+        daily._verify_digest(digest, rows)
+
+        existing = db.successful_delivery(connection, target, settings.recipient)
+        if existing is not None and not args.force_resend:
+            print(
+                f"SEND SKIPPED date={target} already delivered to "
+                f"{settings.recipient} (delivery {existing['delivery_id']}). "
+                "Use --force-resend to override."
+            )
+            return 0
+
+        prepared = mailer.build_message(
+            settings=settings, sender=mailer.sender_address(),
+            subject=digest.subject, html=digest.html, text=digest.text,
+            images=digest.images,
+        )
+        daily._verify_message(prepared, digest)
+        status = mailer.send(prepared, settings)
+        delivery_id = db.record_delivery(
+            connection,
+            target_date=target,
+            recipient=settings.recipient,
+            content_hash_value=digest.content_hash,
+            state="sent",
+            message_id=prepared.message_id,
+            smtp_status=status,
+            message_bytes=prepared.size_bytes,
+            image_count=prepared.image_count,
+            forced=args.force_resend,
+            sent_at=db.now_utc(),
+        )
+    finally:
+        connection.close()
+
+    print(
+        f"SEND OK date={target} to={settings.recipient} "
+        f"size={prepared.size_bytes}B images={prepared.image_count} "
+        f"delivery={delivery_id}"
+    )
+    print(f"  subject: {prepared.subject}")
+    print(f"  message-id: {prepared.message_id}")
+    return 0
+
+
+def _cmd_status(args: argparse.Namespace) -> int:
+    from . import db, settings as settings_module, systemd_units
+
+    settings = settings_module.load()
+    connection = _open_db()
+    try:
+        runs = list(
+            connection.execute(
+                "SELECT * FROM runs ORDER BY run_id DESC LIMIT ?", (args.limit,)
+            )
+        )
+        deliveries = list(
+            connection.execute(
+                "SELECT * FROM deliveries ORDER BY delivery_id DESC LIMIT ?",
+                (args.limit,),
+            )
+        )
+        stats = db.statistics(connection)
+    finally:
+        connection.close()
+
+    print(f"database: {db.database_path()}  schema v{stats['schema_version']}")
+    print(
+        f"  {stats['announcements']} announcements, {stats['versions']} versions, "
+        f"{stats['observations']} observations, {stats['categories']} categories, "
+        f"{stats['dates_covered']} dates"
+    )
+    print(f"\nrecent runs (newest first):")
+    if not runs:
+        print("  (none)")
+    for run in runs:
+        print(
+            f"  #{run['run_id']:<4} {run['target_date']}  {run['status']:<8} "
+            f"unique={run['unique_count'] or 0:<3} new={run['new_count'] or 0:<3} "
+            f"standing={run['standing_count'] or 0:<3} upd={run['changed_count'] or 0:<2} "
+            f"curation={run['curation_method'] or '-':<8} email={run['email_status'] or '-':<18} "
+            f"{run['trigger'] or '-'}"
+        )
+        if run["error_summary"]:
+            print(f"        error: {run['error_summary'][:150]}")
+
+    print(f"\nrecent deliveries:")
+    if not deliveries:
+        print("  (none)")
+    for row in deliveries:
+        print(
+            f"  #{row['delivery_id']:<4} {row['target_date']}  {row['state']:<8} "
+            f"{row['recipient']}  {(row['message_bytes'] or 0) // 1024}KB "
+            f"img={row['image_count'] or 0} "
+            f"{'FORCED ' if row['forced'] else ''}{row['sent_at'] or ''}"
+        )
+        if row["error_summary"]:
+            print(f"        error: {row['error_summary'][:150]}")
+
+    timer = systemd_units.status()
+    print(
+        f"\nsystemd: {timer['timer']} enabled={timer['timer_enabled'] or '-'} "
+        f"active={timer['timer_active'] or '-'} linger={timer['linger']}"
+    )
+    if timer["list_timers"]:
+        print(f"  {timer['list_timers']}")
+    print(f"\nlogs: journalctl --user -u {timer['service']} -n 100 --no-pager")
+    return 0
+
+
+def _cmd_db_status(args: argparse.Namespace) -> int:
+    from . import db, maintenance
+
+    connection = _open_db()
+    try:
+        stats = db.statistics(connection)
+        categories = list(
+            connection.execute(
+                "SELECT category_id, title, manual_priority, inferred_priority, "
+                "first_seen_at FROM categories ORDER BY "
+                "COALESCE(manual_priority, inferred_priority, 999), category_id"
+            )
+        )
+        dates = list(
+            connection.execute(
+                "SELECT target_date, COUNT(*) AS n, "
+                "SUM(CASE WHEN status='New' THEN 1 ELSE 0 END) AS new_n, "
+                "SUM(changed) AS changed_n "
+                "FROM daily_records GROUP BY target_date ORDER BY target_date DESC "
+                "LIMIT 20"
+            )
+        )
+    finally:
+        connection.close()
+
+    path = db.database_path()
+    size = path.stat().st_size if path.exists() else 0
+    print(f"path        : {path}")
+    print(f"size        : {size / 1024:.0f} KB")
+    for key in (
+        "schema_version", "announcements", "versions", "observations",
+        "daily_records", "categories", "distribution_dates", "runs",
+        "deliveries", "dates_covered",
+    ):
+        print(f"{key:<12}: {stats[key]}")
+
+    print(f"\ncategories ({len(categories)}), by effective priority:")
+    for row in categories:
+        marker = (
+            f"manual {row['manual_priority']}"
+            if row["manual_priority"] is not None
+            else (
+                f"inferred {row['inferred_priority']}"
+                if row["inferred_priority"] is not None
+                else "unplaced"
+            )
+        )
+        print(f"  {row['category_id']:>4}  {row['title'][:44]:<44} {marker}")
+
+    print("\ndates stored (newest first):")
+    for row in dates:
+        print(
+            f"  {row['target_date']}  {row['n']:>3} announcements "
+            f"({row['new_n']} new, {row['changed_n'] or 0} updated)"
+        )
+
+    backups = sorted(maintenance.backups_dir().glob("dailymail-*.sqlite3"))
+    print(f"\nbackups: {len(backups)} in {maintenance.backups_dir()}")
+    if backups:
+        print(f"  newest: {backups[-1].name} ({backups[-1].stat().st_size / 1024:.0f} KB)")
+    return 0
+
+
+def _cmd_db_init(args: argparse.Namespace) -> int:
+    from . import db, ingest, settings as settings_module
+
+    _setup_logging()
+    settings_module.ensure_config()
+    settings = settings_module.load()
+    connection = db.connect()
+    version = db.initialize(connection)
+    try:
+        print(f"DB OK {db.database_path()} schema v{version}")
+        if not args.no_import:
+            result = ingest.import_existing_collections(connection, settings)
+            for entry in result["imported"]:
+                print(
+                    f"  imported {entry['target_date']}: "
+                    f"{entry['announcements']} announcements, "
+                    f"{entry['categories']} categories, "
+                    f"{entry['new_versions']} new version(s), "
+                    f"{entry['changed_count']} changed"
+                )
+            for entry in result["skipped"]:
+                print(f"  SKIPPED {entry['file']}: {entry['reason'][:160]}")
+            if not result["imported"] and not result["skipped"]:
+                print(f"  no collection artifacts found in {result['source']}")
+        stats = db.statistics(connection)
+        print(
+            f"  now: {stats['announcements']} announcements, {stats['versions']} versions, "
+            f"{stats['observations']} observations, {stats['categories']} categories, "
+            f"{stats['dates_covered']} dates"
+        )
+    finally:
+        connection.close()
+    return 0
+
+
+def _cmd_install_timer(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    from . import settings as settings_module, systemd_units
+
+    settings_module.ensure_config()
+    settings = settings_module.load()
+    plan = systemd_units.build_plan(
+        working_dir=Path(__file__).resolve().parents[2],
+        send_time=settings.daily_send_time,
+        timezone=settings.timezone,
+        credentials_path=settings_module.credentials_path(),
+    )
+    if args.print_only:
+        print(f"# {plan.service_path}\n{plan.service_text}")
+        print(f"# {plan.timer_path}\n{plan.timer_text}")
+        return 0
+
+    linger_ok, linger_detail = systemd_units.enable_linger()
+    result = systemd_units.install(plan, enable=not args.no_enable)
+    status = systemd_units.status()
+
+    print(f"TIMER {'OK' if result.get('enabled', True) else 'PARTIAL'}")
+    print(f"  service: {result['service_path']}")
+    print(f"  timer  : {result['timer_path']}")
+    print(f"  daemon-reload: {result['daemon_reload']}")
+    print(f"  enabled: {status['timer_enabled']}  active: {status['timer_active']}")
+    print(f"  next   : {status['list_timers'] or '(not scheduled)'}")
+    print(f"  linger : {linger_ok} ({linger_detail})")
+    if not linger_ok:
+        print(
+            "  WARNING: lingering is not enabled, so the timer will not run while "
+            "logged out. Run: loginctl enable-linger $USER",
+            file=sys.stderr,
+        )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -154,6 +659,20 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_collect(args)
         if args.command == "inspect":
             return _cmd_inspect(args)
+        if args.command == "run-daily":
+            return _cmd_run_daily(args)
+        if args.command == "render":
+            return _cmd_render(args)
+        if args.command == "send":
+            return _cmd_send(args)
+        if args.command == "status":
+            return _cmd_status(args)
+        if args.command == "db-status":
+            return _cmd_db_status(args)
+        if args.command == "db-init":
+            return _cmd_db_init(args)
+        if args.command == "install-timer":
+            return _cmd_install_timer(args)
         parser.error(f"unknown command {args.command!r}")
         return 2
     except DailyMailError as exc:

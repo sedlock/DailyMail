@@ -1,0 +1,145 @@
+{#- Outlook-first executive briefing. Table layout, inline CSS, no JS, no web
+    fonts, no collapsible UI. ~680px desktop, fluid on mobile. -#}
+{%- set BROWN = '#57150B' -%}
+{%- set GOLD = '#FFCC00' -%}
+{%- set INK = '#1a1a1a' -%}
+{%- set MUTED = '#6b6b6b' -%}
+{%- set RULE = '#dddddd' -%}
+{%- set FONT = "-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif" -%}
+<!DOCTYPE html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{{ subject }}</title>
+<!--[if mso]>
+<xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+<![endif]-->
+<style>
+  /* Progressive enhancement only. Every critical style is also inline. */
+  a { color: {{ BROWN }}; }
+  img { border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+  table { border-collapse: collapse; }
+  .body-copy p { margin: 0 0 9px 0; }
+  .body-copy ul, .body-copy ol { margin: 0 0 9px 22px; padding: 0; }
+  .body-copy li { margin: 0 0 3px 0; }
+  .body-copy h1, .body-copy h2, .body-copy h3, .body-copy h4 {
+    margin: 12px 0 6px 0; font-size: 16px; line-height: 1.3; color: {{ BROWN }};
+  }
+  .body-copy img { max-width: 100% !important; height: auto !important; }
+  .body-copy table { max-width: 100% !important; }
+  .body-copy { word-break: break-word; overflow-wrap: break-word; }
+  .body-copy a { word-break: break-all; }
+  @media only screen and (max-width: 620px) {
+    .shell { width: 100% !important; max-width: 100% !important; }
+    .pad { padding-left: 14px !important; padding-right: 14px !important; }
+    .subject-link { font-size: 17px !important; }
+    /* Badge row and category label sit side by side on desktop and stack on
+       mobile. Both cells need the override, and the category must be allowed
+       to wrap or its nowrap forces the whole shell wider than the screen. */
+    .stack { display: block !important; width: 100% !important; box-sizing: border-box !important; text-align: left !important; }
+    .cat-right { text-align: left !important; padding-top: 5px !important; padding-left: 0 !important; white-space: normal !important; }
+    .body-copy { font-size: 16px !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#eceaea;-webkit-text-size-adjust:100%;">
+<div style="display:none;font-size:1px;color:#eceaea;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">{{ preheader }}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eceaea;">
+<tr><td align="center" style="padding:10px 8px 24px 8px;">
+
+<!--[if mso]><table role="presentation" width="680" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" class="shell" width="680" cellpadding="0" cellspacing="0" border="0" style="width:680px;max-width:680px;background:#ffffff;">
+
+  {#- ---------------- header: compact, no hero ---------------- -#}
+  <tr><td style="background:{{ BROWN }};padding:14px 20px 12px 20px;" class="pad">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="font-family:{{ FONT }};font-size:15px;font-weight:bold;color:#ffffff;letter-spacing:1.2px;line-height:1.2;">
+        CURATED ROWAN DAILY MAIL
+      </td>
+      <td align="right" style="font-family:{{ FONT }};font-size:12px;color:{{ GOLD }};white-space:nowrap;padding-left:10px;">
+        {{ digest_date_long }}
+      </td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="background:{{ GOLD }};height:3px;line-height:3px;font-size:0;">&nbsp;</td></tr>
+
+  {#- ---------------- stats strip ---------------- -#}
+  <tr><td style="background:#f7f6f5;border-bottom:1px solid {{ RULE }};padding:8px 20px;font-family:{{ FONT }};font-size:12px;color:#333333;" class="pad">
+    <strong style="color:{{ BROWN }};">{{ counts.new }}</strong> new
+    &nbsp;&middot;&nbsp; <strong style="color:{{ BROWN }};">{{ counts.standing }}</strong> standing
+    {%- if counts.changed %} &nbsp;&middot;&nbsp; <strong style="color:{{ BROWN }};">{{ counts.changed }}</strong> updated{% endif %}
+    &nbsp;&middot;&nbsp; {{ counts.unique }} total
+    <br>
+    <span style="color:{{ MUTED }};">
+      {{ counts.everyone }} everyone &nbsp;&middot;&nbsp;
+      {{ counts.employee_only }} employee-only &nbsp;&middot;&nbsp;
+      {{ counts.student_only }} student-only
+      {%- if curation_method == 'fallback' %} &nbsp;&middot;&nbsp; deterministic ordering{% endif %}
+    </span>
+  </td></tr>
+
+  {#- ---------------- NEW ---------------- -#}
+  {%- if new_groups %}
+  <tr><td style="padding:0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr><td style="background:{{ BROWN }};padding:7px 20px;font-family:{{ FONT }};font-size:13px;font-weight:bold;color:#ffffff;letter-spacing:1.5px;" class="pad">
+        NEW <span style="color:{{ GOLD }};font-weight:normal;letter-spacing:0.5px;">&nbsp;&mdash;&nbsp; {{ counts.new }} announcement{{ '' if counts.new == 1 else 's' }}</span>
+      </td></tr>
+    </table>
+  </td></tr>
+    {%- for group in new_groups %}
+  <tr><td style="padding:14px 20px 4px 20px;font-family:{{ FONT }};font-size:11px;font-weight:bold;color:{{ BROWN }};letter-spacing:1.2px;border-bottom:2px solid {{ GOLD }};" class="pad">
+    {{ group.category|upper }}
+  </td></tr>
+      {%- for item in group.announcements %}
+{% include 'announcement.html.j2' %}
+      {%- endfor %}
+    {%- endfor %}
+  {%- endif %}
+
+  {#- ---------------- STANDING ---------------- -#}
+  {%- if standing_items %}
+  <tr><td style="padding:{{ '18px' if new_groups else '0' }} 0 0 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr><td style="background:#4a4a4a;padding:7px 20px;font-family:{{ FONT }};font-size:13px;font-weight:bold;color:#ffffff;letter-spacing:1.5px;" class="pad">
+        STANDING <span style="color:#d8d8d8;font-weight:normal;letter-spacing:0.5px;">&nbsp;&mdash;&nbsp; {{ counts.standing }} continuing announcement{{ '' if counts.standing == 1 else 's' }}</span>
+      </td></tr>
+    </table>
+  </td></tr>
+    {%- for item in standing_items %}
+{% include 'announcement.html.j2' %}
+    {%- endfor %}
+  {%- endif %}
+
+  {%- if not new_groups and not standing_items %}
+  <tr><td style="padding:28px 20px;font-family:{{ FONT }};font-size:15px;color:{{ INK }};text-align:center;" class="pad">
+    Rowan Announcer published no announcements for {{ digest_date_long }}.
+    <div style="font-size:12px;color:{{ MUTED }};padding-top:6px;">
+      This was verified against the source: the collector confirmed a genuine
+      zero-announcement day rather than a collection failure.
+    </div>
+  </td></tr>
+  {%- endif %}
+
+  {#- ---------------- footer ---------------- -#}
+  <tr><td style="background:{{ GOLD }};height:3px;line-height:3px;font-size:0;">&nbsp;</td></tr>
+  <tr><td style="background:#f7f6f5;padding:10px 20px 12px 20px;font-family:{{ FONT }};font-size:11px;color:{{ MUTED }};line-height:1.5;" class="pad">
+    DailyMail &middot; collected from
+    <a href="https://apps.rowan.edu/RowanAnnouncer/" style="color:{{ BROWN }};">Rowan Announcer</a>
+    for {{ target_date }} &middot; {{ counts.unique }} announcement{{ '' if counts.unique == 1 else 's' }},
+    complete content included.
+    {%- if images_embedded %} {{ images_embedded }} image{{ '' if images_embedded == 1 else 's' }} optimized for email.{% endif %}
+    <br>Ordering: {{ 'AI-curated' if curation_method == 'claude' else 'deterministic fallback' }}. Content is reproduced verbatim from the source; nothing is summarized or rewritten.
+  </td></tr>
+
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+
+</td></tr></table>
+</body>
+</html>

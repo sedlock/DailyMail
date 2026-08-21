@@ -1,0 +1,61 @@
+{{ '=' * 72 }}
+CURATED ROWAN DAILY MAIL
+{{ digest_date_long }}
+{{ '=' * 72 }}
+
+{{ counts.new }} new | {{ counts.standing }} standing{% if counts.changed %} | {{ counts.changed }} updated{% endif %} | {{ counts.unique }} total
+{{ counts.everyone }} everyone | {{ counts.employee_only }} employee-only | {{ counts.student_only }} student-only
+Ordering: {{ 'AI-curated' if curation_method == 'claude' else 'deterministic fallback' }}
+{% if new_groups %}
+{{ '=' * 72 }}
+NEW -- {{ counts.new }} announcement{{ '' if counts.new == 1 else 's' }}
+{{ '=' * 72 }}
+{% for group in new_groups %}
+{{ '-' * 72 }}
+{{ group.category|upper }}
+{{ '-' * 72 }}
+{% for item in group.announcements %}
+[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %} | {{ item.audience_label }}] {{ item.category_title }}
+
+{{ item.title }}
+{% if item.event %}
+EVENT: {% if item.event.name %}{{ item.event.name }}{% endif %}{% if item.event.when %} -- {{ item.event.when }}{% endif %}{% if item.event.location %} -- {{ item.event.location }}{% endif %}
+{% endif %}
+{{ item.body_text }}
+{% for line in item.meta_lines %}
+{{ line.label }} {{ line.value }}
+{% endfor %}
+Official announcement: {{ item.official_url }}
+
+{% endfor %}
+{% endfor %}
+{% endif %}
+{% if standing_items %}
+{{ '=' * 72 }}
+STANDING -- {{ counts.standing }} continuing announcement{{ '' if counts.standing == 1 else 's' }}
+{{ '=' * 72 }}
+{% for item in standing_items %}
+[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %} | {{ item.audience_label }}] {{ item.category_title }}
+
+{{ item.title }}
+{% if item.event %}
+EVENT: {% if item.event.name %}{{ item.event.name }}{% endif %}{% if item.event.when %} -- {{ item.event.when }}{% endif %}{% if item.event.location %} -- {{ item.event.location }}{% endif %}
+{% endif %}
+{{ item.body_text }}
+{% for line in item.meta_lines %}
+{{ line.label }} {{ line.value }}
+{% endfor %}
+Official announcement: {{ item.official_url }}
+
+{% endfor %}
+{% endif %}
+{% if not new_groups and not standing_items %}
+Rowan Announcer published no announcements for {{ digest_date_long }}.
+This was verified against the source: a genuine zero-announcement day, not a
+collection failure.
+{% endif %}
+{{ '=' * 72 }}
+DailyMail | Rowan Announcer https://apps.rowan.edu/RowanAnnouncer/ | {{ target_date }}
+{{ counts.unique }} announcement{{ '' if counts.unique == 1 else 's' }}, complete content included.
+Content is reproduced verbatim from the source; nothing is summarized.
+{{ '=' * 72 }}
