@@ -1,0 +1,90 @@
+<?xml version='1.0' encoding='utf-8'?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Camden Campus &amp; CMSRU | Rowan Univeristy</name>
+    <description>Rowan University Camden Campus and CMSRU in Camden, NJ</description>
+    <Folder>
+      <name>Locations</name>
+      <Placemark>
+        <name>Camden Academic Building</name>
+        <description>Located in the University District, the five story building of Rowan Camden campus, includes the restored First Camden National Bank and Trust building at 606 Cooper Street, a new three-story addition at the former bank's rear and an Annex building located at Broadway and Cooper, features 40 classrooms and serves over 800 students each year.&lt;br&gt;&lt;br&gt;Keywords: camden campus, camden, off campus, &lt;br&gt;Categories: Academic Buildings &lt;br&gt;Location: 39.946175, -75.118851</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>camden campus, camden, off campus, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings </value>
+          </Data>
+          <Data name="Location">
+            <value>39.946175, -75.118851</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118851,39.946175,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Cooper Medical School at Rowan University</name>
+        <description>CMSRU's six story Medical Education Building features 200,000 square feet of learning spaces, administrative offices and research facilities. Inside the building are 27 Active Learning Rooms, several floors of research and teaching labs, to be used by both students and faculty, an auditorium seating 250 people, a large multipurpose room seating 140, a multipurpose Teaching Laboratory seating 120, Wellness Facilities, a Learning Commons and satellite Medical Library where students can meet in a casual and comfortable setting with CMSRU's faculty and each other. A Clinical Simulation Center is also in this facility, providing students with space to learn interviewing and clinical skills. Medical school administrative offices, including the dean's office, student services and financial aid are here as well.&lt;br&gt;&lt;br&gt;Keywords: cooper, medical school, science, med school, medicine&lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.940453, -75.119698</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>cooper, medical school, science, med school, medicine</value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.940453, -75.119698</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119698,39.940453,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Camden Shuttle Stop</name>
+        <description>This is the location of the Shuttle stop for Camden Campus where students will either be dropped of or picked up for easy travel to this additional campus.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Shuttle Stop Locations&lt;br&gt;Location: 39.9461061, -75.1186491</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Shuttle Stop Locations</value>
+          </Data>
+          <Data name="Location">
+            <value>39.9461061, -75.1186491</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.1186491,39.9461061,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Joint Health Sciences Center</name>
+        <description>&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: &lt;br&gt;Location: </description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value />
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.1195742,39.9422857,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>

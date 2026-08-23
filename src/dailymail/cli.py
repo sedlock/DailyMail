@@ -11,6 +11,10 @@
     uv run dailymail db-status                      # database statistics
     uv run dailymail db-init                        # create/import history
     uv run dailymail install-timer                  # systemd service + timer
+    uv run dailymail parking-status                 # parking cache summary
+    uv run dailymail parking-lookup "Lot O-1"       # verify one parking record
+    uv run dailymail parking-refresh                # re-check authoritative sources
+    uv run dailymail parking-set --id ... --lat ... # manual correction
 
 Success is one concise line. Announcement bodies are never printed, and no
 credential is ever logged. Any failure exits non-zero with a distinct code
@@ -88,6 +92,8 @@ def _build_parser() -> argparse.ArgumentParser:
     render_parser.add_argument("--out", metavar="DIR", default=None,
                                help="Directory for the .html/.txt preview "
                                     "(default: the diagnostics directory).")
+    render_parser.add_argument("--no-parking", action="store_true",
+                               help="Skip parking enrichment in the preview.")
     render_parser.add_argument("--inline-images", action="store_true",
                                help="Inline CID images as data URIs so the preview "
                                     "can be opened directly in a browser.")
@@ -109,6 +115,62 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     init_parser.add_argument("--no-import", action="store_true",
                              help="Create the schema without importing artifacts.")
+
+    parking_status = subparsers.add_parser(
+        "parking-status", help="Parking reference cache: counts, sources, misses."
+    )
+    parking_status.add_argument("--campus", default=None,
+                                help="Restrict to one campus (glassboro, stratford, "
+                                     "camden, sewell).")
+    parking_status.add_argument("--list", action="store_true",
+                                help="List every cached parking location.")
+
+    parking_lookup = subparsers.add_parser(
+        "parking-lookup",
+        help="Look up one parking facility by name, alias or canonical id.",
+    )
+    parking_lookup.add_argument("name", help='e.g. "Lot O-1" or glassboro:lot:o-1')
+    parking_lookup.add_argument("--campus", default=None)
+
+    parking_refresh_parser = subparsers.add_parser(
+        "parking-refresh",
+        help="Re-check the authoritative parking sources and cache what changed.",
+    )
+    parking_refresh_parser.add_argument("--campus", default=None)
+    parking_refresh_parser.add_argument("--source", default=None,
+                                        help="Refresh a single source id.")
+    parking_refresh_parser.add_argument(
+        "--no-descriptions", action="store_true",
+        help="Skip generating plain-English descriptions (no Claude call).")
+    parking_refresh_parser.add_argument("-v", "--verbose", action="store_true")
+
+    parking_set = subparsers.add_parser(
+        "parking-set",
+        help="Manually correct a parking record. Overridden fields are pinned and "
+             "never overwritten by an automated refresh.",
+    )
+    parking_set.add_argument("canonical_id", help="e.g. glassboro:lot:o-1")
+    parking_set.add_argument("--description", default=None)
+    parking_set.add_argument("--latitude", type=float, default=None)
+    parking_set.add_argument("--longitude", type=float, default=None)
+    parking_set.add_argument("--permit-class", default=None,
+                             help="Employee, Student, Patient, Visitor, Resident, "
+                                  "Commuter, Mixed or Unknown.")
+    parking_set.add_argument("--location-type", default=None,
+                             help="surface_lot, garage, patient_lot, visitor_lot "
+                                  "or other.")
+    parking_set.add_argument("--canonical-name", default=None)
+    parking_set.add_argument("--confidence", default=None,
+                             choices=["low", "medium", "high"])
+    parking_set.add_argument("--inactive", action="store_true",
+                             help="Mark the facility as no longer in service.")
+    parking_set.add_argument("--active", action="store_true",
+                             help="Mark the facility as in service again.")
+    parking_set.add_argument("--alias", action="append", default=[],
+                             help="Add a manual alias (repeatable).")
+    parking_set.add_argument("--clear-overrides", action="store_true",
+                             help="Release all pinned fields back to automated "
+                                  "refresh.")
 
     timer_parser = subparsers.add_parser(
         "install-timer", help="Install and enable the systemd user service and timer."
@@ -269,6 +331,15 @@ def _cmd_run_daily(args: argparse.Namespace) -> int:
             f"omitted={images['omitted']} "
             f"{images['original_bytes'] // 1024}KB -> {images['final_bytes'] // 1024}KB"
         )
+    if result.parking and result.parking.get("mentions_detected"):
+        park = result.parking
+        print(
+            f"  parking: mentions={park['mentions_detected']} "
+            f"hits={park['cache_hits']} misses={park['cache_misses']} "
+            f"refreshes={park['source_refreshes']} agent={park['resolver_calls']} "
+            f"new={park['new_resolutions']} unresolved={park['unresolved']} "
+            f"{park['duration_seconds']}s"
+        )
     print(
         f"  email: {result.email_status}"
         + (f" size={result.message_bytes}B" if result.message_bytes else "")
@@ -293,7 +364,14 @@ def _cmd_render(args: argparse.Namespace) -> int:
     import base64
     from pathlib import Path
 
-    from . import curate, db, maintenance, render, settings as settings_module
+    from . import (
+        curate,
+        db,
+        maintenance,
+        parking_enrich,
+        render,
+        settings as settings_module,
+    )
 
     settings_module.ensure_config()
     settings = settings_module.load()
@@ -326,9 +404,19 @@ def _cmd_render(args: argparse.Namespace) -> int:
             ordering = {entry["submission_id"]: entry for entry in entries}
             method = "fallback"
 
+        # A preview resolves parking from the cache only: no source fetch, no
+        # resolver call, so rendering a historical date is fast and repeatable.
+        parking_callouts: dict = {}
+        parking_metrics = None
+        if not args.no_parking:
+            parking_callouts, parking_metrics = parking_enrich.enrich_digest(
+                connection, rows, target_date=target, settings=settings,
+                allow_refresh=False, allow_resolver=False,
+            )
+
         digest = render.render_digest(
             rows, target_date=target, counts=counts, ordering=ordering,
-            curation_method=method, settings=settings,
+            curation_method=method, settings=settings, parking=parking_callouts,
         )
     finally:
         connection.close()
@@ -360,6 +448,15 @@ def _cmd_render(args: argparse.Namespace) -> int:
         f"ordering={method}"
     )
     print(f"  subject: {digest.subject}")
+    if parking_metrics is not None and parking_metrics.mentions_detected:
+        print(
+            f"  parking: {parking_metrics.mentions_detected} mention(s), "
+            f"{digest.parking_callouts} callout(s), "
+            f"{digest.parking_unresolved} fallback(s), "
+            f"{parking_metrics.cache_hits} cache hit(s), "
+            f"{parking_metrics.resolver_calls} agent call(s), "
+            f"{parking_metrics.duration_seconds:.3f}s"
+        )
     print(f"  {html_path}")
     print(f"  {text_path}")
     return 0
@@ -374,7 +471,7 @@ def _cmd_send(args: argparse.Namespace) -> int:
     settings = settings_module.load()
     target = collect.parse_target_date(args.date)
 
-    from . import curate, db, mailer, render
+    from . import curate, db, mailer, parking_enrich, render
 
     connection = _open_db()
     try:
@@ -402,9 +499,13 @@ def _cmd_send(args: argparse.Namespace) -> int:
             ordering = {e["submission_id"]: e for e in entries}
             method = "fallback"
 
+        parking_callouts, _ = parking_enrich.enrich_digest(
+            connection, rows, target_date=target, settings=settings,
+            allow_refresh=False, allow_resolver=False,
+        )
         digest = render.render_digest(
             rows, target_date=target, counts=counts, ordering=ordering,
-            curation_method=method, settings=settings,
+            curation_method=method, settings=settings, parking=parking_callouts,
         )
         daily._verify_digest(digest, rows)
 
@@ -504,6 +605,15 @@ def _cmd_status(args: argparse.Namespace) -> int:
         if row["error_summary"]:
             print(f"        error: {row['error_summary'][:150]}")
 
+    print(
+        f"\nparking cache: {stats['parking_locations']} location(s), "
+        f"{stats['parking_aliases']} alias(es), {stats['parking_sources']} source(s), "
+        f"{stats['parking_unresolved']} unresolved"
+    )
+    for run in runs[:1]:
+        if run["parking_stats"]:
+            print(f"  last run: {run['parking_stats'][:200]}")
+
     timer = systemd_units.status()
     print(
         f"\nsystemd: {timer['timer']} enabled={timer['timer_enabled'] or '-'} "
@@ -547,7 +657,8 @@ def _cmd_db_status(args: argparse.Namespace) -> int:
     for key in (
         "schema_version", "announcements", "versions", "observations",
         "daily_records", "categories", "distribution_dates", "runs",
-        "deliveries", "dates_covered",
+        "deliveries", "dates_covered", "parking_locations", "parking_aliases",
+        "parking_sources", "parking_unresolved",
     ):
         print(f"{key:<12}: {stats[key]}")
 
@@ -651,6 +762,332 @@ def _cmd_install_timer(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- parking -----------------------------------------------------------------
+
+
+def _parking_line(row) -> str:
+    coordinates = (
+        f"{row['latitude']:.6f},{row['longitude']:.6f}"
+        if row["latitude"] is not None
+        else "(no coordinate)"
+    )
+    flags = []
+    if row["manual_override"]:
+        flags.append("MANUAL")
+    if not row["is_active"]:
+        flags.append("INACTIVE")
+    if not (row["description"] or "").strip():
+        flags.append("NO-DESC")
+    return (
+        f"  {row['canonical_id']:<34} {row['canonical_name'][:26]:<26} "
+        f"{row['location_type']:<12} {row['permit_class']:<9} "
+        f"{row['confidence']:<6} {coordinates:<22} {' '.join(flags)}"
+    ).rstrip()
+
+
+def _cmd_parking_status(args: argparse.Namespace) -> int:
+    from . import parking, parking_store
+
+    campus = _valid_campus(getattr(args, "campus", None))
+    connection = _open_db()
+    try:
+        stats = parking_store.statistics(connection)
+        locations = (
+            parking_store.all_locations(connection, campus=campus)
+            if args.list
+            else []
+        )
+        unresolved = parking_store.unresolved_rows(connection)
+    finally:
+        connection.close()
+
+    print(
+        f"parking cache: {stats['locations']} location(s), {stats['aliases']} alias(es), "
+        f"{stats['with_coordinates']} with coordinates, "
+        f"{stats['with_description']} with a description"
+    )
+    if stats["inactive"]:
+        print(f"  {stats['inactive']} inactive location(s)")
+    print(f"  manual overrides: {stats['manual_overrides']}")
+
+    print("\nby campus:")
+    if not stats["by_campus"]:
+        print("  (empty -- run: uv run dailymail parking-refresh)")
+    for name, entry in sorted(stats["by_campus"].items()):
+        display = parking.CAMPUSES.get(name, {}).get("display", name)
+        print(
+            f"  {display:<12} {entry['locations']:>3} location(s), "
+            f"{stats['aliases_by_campus'].get(name, 0):>3} alias(es), "
+            f"{entry['with_coordinates']} geo, {entry['with_description']} described, "
+            f"{entry['manual_overrides']} manual"
+        )
+
+    if stats["by_type"]:
+        print("\nby type:   " + "  ".join(
+            f"{key}={value}" for key, value in sorted(stats["by_type"].items())
+        ))
+    if stats["by_permit"]:
+        print("by permit: " + "  ".join(
+            f"{key}={value}" for key, value in sorted(stats["by_permit"].items())
+        ))
+
+    oldest = stats["oldest_verification"]
+    print(
+        f"\noldest verification: "
+        + (f"{oldest['canonical_id']} at {oldest['at']}" if oldest else "(none)")
+    )
+    print(f"last source refresh : {stats['last_source_refresh'] or '(never)'}")
+
+    print("\nsources:")
+    if not stats["sources"]:
+        print("  (none checked yet)")
+    for source in stats["sources"]:
+        if campus and source["campus"] != campus:
+            continue
+        print(
+            f"  {source['source_id']:<30} {source['campus']:<10} "
+            f"{source['last_status'] or '-':<15} "
+            f"seen={source['locations_seen'] if source['locations_seen'] is not None else '-':<4} "
+            f"verified={source['last_verified_at'] or '-'}"
+        )
+        if source["last_error"]:
+            print(f"      error: {source['last_error'][:140]}")
+
+    print(f"\nunresolved candidates: {len(unresolved)}")
+    for row in unresolved[:15]:
+        print(
+            f"  {row['matched_text'][:28]:<30} campus={row['campus_hint'] or '?':<10} "
+            f"seen={row['attempts']} resolver={row['resolver_calls']} "
+            f"{(row['last_reason'] or '')[:70]}"
+        )
+
+    if args.list:
+        print(f"\nlocations ({len(locations)}):")
+        for row in locations:
+            print(_parking_line(row))
+    return 0
+
+
+def _cmd_parking_lookup(args: argparse.Namespace) -> int:
+    from . import parking, parking_sources, parking_store
+
+    campus = _valid_campus(getattr(args, "campus", None))
+    connection = _open_db()
+    try:
+        matches = parking_store.find_locations(connection, args.name, campus=campus)
+        aliases = {
+            int(row["location_id"]): row["names"]
+            for row in connection.execute(
+                "SELECT location_id, GROUP_CONCAT(alias, ' | ') AS names "
+                "FROM parking_aliases GROUP BY location_id"
+            )
+        }
+    finally:
+        connection.close()
+
+    if not matches:
+        print(f"no parking location matches {args.name!r}", file=sys.stderr)
+        print(
+            "  try: uv run dailymail parking-status --list",
+            file=sys.stderr,
+        )
+        return 1
+
+    if len(matches) > 1:
+        print(
+            f"{len(matches)} locations match {args.name!r} -- this is exactly the "
+            f"cross-campus ambiguity the resolver refuses to guess through:"
+        )
+    for row in matches:
+        campus_display = parking.CAMPUSES.get(row["campus"], {}).get(
+            "display", row["campus"]
+        )
+        print(f"\n{row['canonical_name']}  [{row['canonical_id']}]")
+        print(f"  campus       : {campus_display}")
+        print(f"  type         : {row['location_type']}")
+        print(f"  permit / use : {row['permit_class']}")
+        print(f"  description  : {row['description'] or '(none cached)'}")
+        if row["latitude"] is not None:
+            print(f"  coordinates  : {row['latitude']:.6f}, {row['longitude']:.6f}")
+            print(f"  google maps  : {parking.maps_url(row['latitude'], row['longitude'])}")
+        else:
+            url, label = parking_sources.fallback_map_url(row["campus"])
+            print("  coordinates  : (none cached)")
+            print(f"  fallback map : {url}  ({label})")
+        print(f"  confidence   : {row['confidence']}")
+        print(f"  active       : {'yes' if row['is_active'] else 'no'}")
+        print(f"  source       : {row['source_id'] or '-'} ({row['source_type'] or '-'})")
+        print(f"  source url   : {row['source_url'] or '-'}")
+        if row["source_map_id"]:
+            print(f"  source map id: {row['source_map_id']}")
+        if row["source_fingerprint"]:
+            print(f"  fingerprint  : {row['source_fingerprint'][:16]}...")
+        if row["provenance"]:
+            print(f"  provenance   : {row['provenance']}")
+        print(f"  description by: {row['description_method'] or '-'}"
+              f" {row['description_model'] or ''}".rstrip())
+        print(f"  first seen   : {row['first_discovered_at']}")
+        print(f"  last verified: {row['last_verified_at']}")
+        print(f"  last changed : {row['last_changed_at']}")
+        if row["manual_override"]:
+            print(f"  MANUAL OVERRIDE on: {row['override_fields']}")
+        print(f"  aliases      : {aliases.get(int(row['location_id']), '-')}")
+    return 0
+
+
+def _cmd_parking_refresh(args: argparse.Namespace) -> int:
+    from . import parking_refresh, settings as settings_module
+
+    _setup_logging(getattr(args, "verbose", False))
+    settings_module.ensure_config()
+    settings = settings_module.load()
+    campus = _valid_campus(getattr(args, "campus", None))
+
+    connection = _open_db()
+    try:
+        outcome = parking_refresh.refresh(
+            connection,
+            settings,
+            campus=campus,
+            source_ids=[args.source] if args.source else None,
+            describe=not args.no_descriptions,
+        )
+    finally:
+        connection.close()
+
+    failures = [entry for entry in outcome.sources if entry.status == "error"]
+    print(
+        f"PARKING REFRESH {'PARTIAL' if failures else 'OK'} "
+        f"sources={len(outcome.sources)} "
+        f"changed={sum(1 for e in outcome.sources if e.changed)} "
+        f"locations_touched={outcome.locations_touched}"
+    )
+    for entry in outcome.sources:
+        print(
+            f"  {entry.source_id:<30} {entry.status:<15} "
+            f"seen={entry.locations_seen:<3} +{entry.inserted} ~{entry.updated} "
+            f"={entry.unchanged} pinned={entry.overrides_preserved} "
+            f"landmarks={entry.landmarks}"
+            + (f" unnamed_parking={entry.unnamed_parking}" if entry.unnamed_parking else "")
+        )
+        if entry.error:
+            print(f"      error: {entry.error[:160]}", file=sys.stderr)
+        for warning in entry.warnings[:5]:
+            print(f"      WARN {warning[:160]}", file=sys.stderr)
+    if outcome.review_needed:
+        print(
+            "  REVIEW: hand-derived source(s) changed upstream; records left "
+            f"untouched: {', '.join(outcome.review_needed)}",
+            file=sys.stderr,
+        )
+    print(
+        f"  descriptions: {outcome.descriptions_written} written, "
+        f"{len(outcome.descriptions_rejected)} rejected, "
+        f"{outcome.description_calls} agent call(s), "
+        f"${outcome.description_cost_usd:.4f}"
+        + (f", model={outcome.description_model}" if outcome.description_model else "")
+    )
+    for canonical_id, reason in list(outcome.descriptions_rejected.items())[:10]:
+        print(f"      REJECTED {canonical_id}: {reason[:140]}", file=sys.stderr)
+    if outcome.description_error:
+        print(f"      description error: {outcome.description_error}", file=sys.stderr)
+    return 1 if failures else 0
+
+
+def _cmd_parking_set(args: argparse.Namespace) -> int:
+    from . import db, parking, parking_store
+
+    connection = _open_db()
+    try:
+        if args.clear_overrides:
+            row = parking_store.clear_manual_override(connection, args.canonical_id)
+            if row is None:
+                raise UsageError(f"no parking location {args.canonical_id!r}")
+            print(f"PARKING OVERRIDE CLEARED {args.canonical_id}")
+            return 0
+
+        fields: dict = {}
+        if args.description is not None:
+            fields["description"] = " ".join(args.description.split())
+        if args.latitude is not None:
+            fields["latitude"] = args.latitude
+        if args.longitude is not None:
+            fields["longitude"] = args.longitude
+        if args.permit_class is not None:
+            if args.permit_class not in parking.PERMIT_CLASSES:
+                raise UsageError(
+                    f"--permit-class must be one of {list(parking.PERMIT_CLASSES)}"
+                )
+            fields["permit_class"] = args.permit_class
+        if args.location_type is not None:
+            if args.location_type not in parking.LOCATION_TYPES:
+                raise UsageError(
+                    f"--location-type must be one of {list(parking.LOCATION_TYPES)}"
+                )
+            fields["location_type"] = args.location_type
+        if args.canonical_name is not None:
+            fields["canonical_name"] = " ".join(args.canonical_name.split())
+        if args.confidence is not None:
+            fields["confidence"] = args.confidence
+        if args.inactive and args.active:
+            raise UsageError("--inactive and --active are mutually exclusive")
+        if args.inactive:
+            fields["is_active"] = False
+        if args.active:
+            fields["is_active"] = True
+
+        if not fields and not args.alias:
+            raise UsageError(
+                "nothing to change; pass at least one of --description, --latitude, "
+                "--longitude, --permit-class, --location-type, --canonical-name, "
+                "--confidence, --inactive/--active or --alias"
+            )
+
+        row = None
+        if fields:
+            try:
+                row = parking_store.set_manual_override(
+                    connection, args.canonical_id, fields
+                )
+            except parking.ParkingDataError as exc:
+                raise UsageError(str(exc)) from exc
+        else:
+            row = parking_store.location_by_canonical_id(connection, args.canonical_id)
+            if row is None:
+                raise UsageError(f"no parking location {args.canonical_id!r}")
+
+        if args.alias:
+            with db.transaction(connection):
+                added = parking_store.add_aliases(
+                    connection, int(row["location_id"]), row["campus"], args.alias,
+                    origin="manual",
+                )
+            print(f"  {added} alias(es) added of {len(args.alias)} requested")
+    finally:
+        connection.close()
+
+    print(f"PARKING SET OK {args.canonical_id}")
+    for key in sorted(fields):
+        print(f"  {key} = {fields[key]!r}  (pinned against automated refresh)")
+    if row["latitude"] is not None:
+        print(f"  google maps: {parking.maps_url(row['latitude'], row['longitude'])}")
+    return 0
+
+
+def _valid_campus(value: str | None) -> str | None:
+    from . import parking
+
+    if value is None:
+        return None
+    campus = value.strip().lower()
+    if campus not in parking.CAMPUSES:
+        raise UsageError(
+            f"unknown campus {value!r}; known campuses are "
+            f"{sorted(parking.CAMPUSES)}"
+        )
+    return campus
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -673,6 +1110,14 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_db_init(args)
         if args.command == "install-timer":
             return _cmd_install_timer(args)
+        if args.command == "parking-status":
+            return _cmd_parking_status(args)
+        if args.command == "parking-lookup":
+            return _cmd_parking_lookup(args)
+        if args.command == "parking-refresh":
+            return _cmd_parking_refresh(args)
+        if args.command == "parking-set":
+            return _cmd_parking_set(args)
         parser.error(f"unknown command {args.command!r}")
         return 2
     except DailyMailError as exc:

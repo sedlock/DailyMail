@@ -1,15 +1,15 @@
 # DailyMail Operations (Phase 2 — production)
 
-Companion to `docs/site-reconnaissance.md` (Phase 0) and
-`docs/collector-architecture.md` (Phase 1), both of which remain accurate. This
-document covers the production system: history, curation, rendering, delivery and
-scheduling.
+Companion to `docs/site-reconnaissance.md` (Phase 0),
+`docs/collector-architecture.md` (Phase 1) and `docs/parking-enrichment.md`
+(Phase 3), all of which remain accurate. This document covers the production
+system: history, curation, rendering, delivery and scheduling.
 
 ---
 
 ## 1. Daily pipeline
 
-`dailymail.timer` fires `dailymail.service` at **07:00 America/New_York**, which
+`dailymail.timer` fires `dailymail.service` at **06:30 America/New_York**, which
 runs `uv run --frozen dailymail run-daily --trigger timer`:
 
 ```
@@ -18,6 +18,7 @@ overlap lock
   -> validate (Phase 1 gates V1-V9, V12)      structural failure = no retry
   -> persist to SQLite                        versions only on real change
   -> detect substantive updates
+  -> parking enrichment                       cache hit = a dictionary lookup
   -> curate (Claude; deterministic fallback on any failure)
   -> render HTML + plain text deterministically
   -> verify the rendering, then the message
@@ -40,6 +41,7 @@ is two HTTP requests and under two seconds.
 | Render failure or an incomplete rendering | **Nothing sent.** Recorded, alert emailed |
 | SMTP failure | Retried up to 3 times, then recorded and exit non-zero. Deliberately **no** alert email — that is the channel that just failed |
 | Already delivered today | Exits cleanly without resending |
+| Parking source unreachable, resolver failure, or an unresolvable lot | Recorded in `runs.parking_stats`; the announcement shows the official campus parking map instead. **No alert**, and the digest is unaffected |
 
 ---
 
@@ -69,6 +71,15 @@ uv run dailymail send --date 2026-08-20 --force-resend
 uv run dailymail db-init                         # create schema, import artifacts
 uv run dailymail install-timer                   # write + enable units
 uv run dailymail install-timer --print-only      # show the units
+
+# parking reference data (docs/parking-enrichment.md)
+uv run dailymail parking-status                  # cache, campuses, sources, misses
+uv run dailymail parking-status --list
+uv run dailymail parking-lookup "Lot O-1"        # one record, with its map URL
+uv run dailymail parking-refresh                 # re-check authoritative sources
+uv run dailymail parking-refresh --campus glassboro
+uv run dailymail parking-set glassboro:lot:o-1 --description "..." \
+    --latitude 39.712482 --longitude -75.120453  # pinned manual correction
 
 # tests
 uv run pytest
@@ -124,7 +135,7 @@ dropping below the three most recent).
 
 ---
 
-## 4. Database schema (version 1)
+## 4. Database schema (version 2)
 
 Plain `sqlite3`: foreign keys on, WAL, 10 s busy timeout, explicit transactions.
 One integer version in `schema_meta`; no migration framework.
@@ -140,6 +151,17 @@ One integer version in `schema_meta`; no migration framework.
 | `daily_records` | Per-day status (`New`/`Standing`), the version shown, and a sticky `changed` flag |
 | `curation_results` | Section, rank, relevance/urgency, rationale, method, model |
 | `deliveries` | Recipient, timestamps, Message-ID, content hash, SMTP status, size, forced flag |
+| `parking_locations` | One durable row per parking facility: campus-scoped canonical id, type, permit class, description, coordinates, provenance, confidence, manual-override pins |
+| `parking_aliases` | Every spelling matched, normalized, unique per campus |
+| `parking_sources` | Per-source fingerprint, status and verification timestamps |
+| `parking_landmarks` | Named campus features, for description evidence and campus disambiguation |
+| `announcement_parking_locations` | Which announcement referenced which lot, on which date, how it matched |
+| `parking_unresolved` | Candidates that could not be resolved, with attempt counts and reasons |
+
+`runs.parking_stats` holds one JSON object of per-run parking counters. The
+upgrade from version 1 is additive — `CREATE TABLE IF NOT EXISTS` plus one
+`ALTER TABLE runs ADD COLUMN` — transactional, idempotent, and it neither
+rewrites nor reads any existing announcement row.
 
 ### Substantive change detection
 
@@ -288,8 +310,9 @@ multipart/alternative
 Compact brown header with a gold rule, a one-line stats strip, then `NEW`
 grouped by category priority and `STANDING` in a single ranked list. Each card
 carries status/updated/audience badges, category, the subject as a hyperlink,
-event box, the **complete** announcement body, contact/submitter/approver
-metadata, and a `View official announcement` button. No hero image, no branding
+event box, a parking-location callout when the announcement names a lot, the
+**complete** announcement body, contact/submitter/approver metadata, and a
+`View official announcement` button. No hero image, no branding
 block, no category directory, no navigation required to read the content.
 
 Rowan brown `#57150B` and gold `#FFCC00` are used for hierarchy and accent only,
@@ -317,6 +340,15 @@ parts. Anything undecodable, insecure, or over budget is replaced with a visible
 `Image available in the official announcement` link. A bad image never fails the
 digest. Measured: the 1.21 MB inline image in announcement 6602 became a 91 KB
 JPEG at 1500×600.
+
+### Parking location
+
+An announcement naming a parking facility gets one compact block between its
+metadata and its body: the lot name, a one-sentence plain-English location, and
+`Open in Google Maps` built from stored coordinates. The announcement text is
+never altered — the block is additive, and it is deliberately **not** part of the
+digest content hash. Unresolvable lots get a one-line link to the official campus
+parking map. Full detail in `docs/parking-enrichment.md`.
 
 ### Idempotency
 

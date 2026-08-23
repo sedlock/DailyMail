@@ -62,8 +62,10 @@ OnCalendar={calendar}
 # Run a missed occurrence once the user manager is available again, so a reboot
 # or an outage does not silently skip a day.
 Persistent=true
-AccuracySec=1min
-RandomizedDelaySec=60
+# One second of slack, and deliberately no RandomizedDelaySec: the requested
+# time is the delivery time, so jitter that pushes the run materially later is
+# not wanted here.
+AccuracySec=1s
 Unit={service}
 
 [Install]

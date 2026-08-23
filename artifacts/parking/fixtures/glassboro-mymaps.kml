@@ -1,0 +1,2665 @@
+<?xml version='1.0' encoding='utf-8'?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Main Campus | Glassboro</name>
+    <description>Rowan University Main Campus in Glassboro</description>
+    <Folder>
+      <name>Academic Buildings</name>
+      <Placemark>
+        <name>230 Victoria</name>
+        <description>Student housing on Victoria Street, 6 floors of housing holding 413 student beds. Each suite in this building consists of a single or double bedrooms, with up to 8 bedrooms per housing suite. Each suite shares a kitchen, a bathroom and a living area. The building also houses a recreation center, a parking garage, retail space, and classrooms and offices.Departments:Writing Arts Communication Studies&lt;br&gt;&lt;br&gt;Keywords: Writing Arts, Communication studies, parking, recreation, gym, housing, new housing, apartments, student housing, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.704281, -75.113571</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Writing Arts, Communication studies, parking, recreation, gym, housing, new housing, apartments, student housing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.704281, -75.113571</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.113571,39.704281,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>301 West High Street</name>
+        <description>The three story building features the new Rowan University art gallery. It  features classrooms, faculty offices, computer labs and student lounge spaces. Departments:Public Relations &amp; Advertising&lt;br&gt;&lt;br&gt;Keywords: Journalism. PR, Public Relations, computer lab, advertising, faculty, art, gallery, art gallery, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.703812,-75.115105</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Journalism. PR, Public Relations, computer lab, advertising, faculty, art, gallery, art gallery, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.703812,-75.115105</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115105,39.703812,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>6 High Street</name>
+        <description>This former bank building in downtown Glassboro is now home to the Dean's office for the College of Communication &amp; Creative Arts,Departments:Journalism&lt;br&gt;&lt;br&gt;Keywords: writing arts, dean, writing arts dean, offices, high street, bank, bank building, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.70256,-75.111809</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>writing arts, dean, writing arts dean, offices, high street, bank, bank building, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70256,-75.111809</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.111809,39.70256,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>600 Whitney Avenue</name>
+        <description>This building houses the Dean's office for the College of Earth and Environment as well as the Fossil Park Office.&lt;br&gt;&lt;br&gt;Keywords: earth and environment, dean's office, fossil park, fossil park office, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.705441,-75.118759</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>earth and environment, dean's office, fossil park, fossil park office, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.705441,-75.118759</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118759,39.705441,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bozorth Hall</name>
+        <description>Originally built as a campus demonstration elementary school, Bozorth Hall houses the College of Communication &amp; Creative Arts offices, Rowan Radio, Rowan TV, a distance learning classroom, film-editing facilities, a computer-equipped journalism newsroom, an advertising/PR client suite, a layout room, and a computer-equipped writing laboratory. Departments:Radio/TV/Film.&lt;br&gt;&lt;br&gt;Keywords: communication and creative arts, rowan radio, rowan TV, newsroom, writing, writing lab, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.708061,-75.121704</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>communication and creative arts, rowan radio, rowan TV, newsroom, writing, writing lab, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.708061,-75.121704</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121704,39.708061,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bunce Hall</name>
+        <description>The first building on campus, Bunce Hall was built in 1923. This building features classroom and office space as well as the Tohill Auditorium. Departments:EnglishForeign Languages and LiteraturesPhilosophy and Religion&lt;br&gt;&lt;br&gt;Keywords: dance, foreign language and literatures, languages, french, spanish, russian, Chinese, Japanese, arabic&lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.707233,-75.120613</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>dance, foreign language and literatures, languages, french, spanish, russian, Chinese, Japanese, arabic</value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.707233,-75.120613</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.120613,39.707233,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Business Hall</name>
+        <description>Home to the Rohrer College of Business, this $63.2 million building opened in 2017. It includes 14 classrooms, seven conference rooms, 10 specialty spaces, 15 administrative offices and 70 faculty offices. The building houses RCB's trading room with its ticker tracking the stock market in real time;  the Center for Professional Development, a valuable resource for students dedicated to providing career preparation skills designed to make them stand out in the job market; and Hatch House, a business accelerator dedicated to supporting student entrepreneurism in all majors across campus. Departments:Accounting FinanceManagementEntrepreneurshipMarketingBusiness Information Systems.&lt;br&gt;&lt;br&gt;Keywords: Business, marketing, finance, stock market, accounting, new, new building, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.710075,-75.122559</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Business, marketing, finance, stock market, accounting, new, new building, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.710075,-75.122559</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.122559,39.710075,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Campbell Library</name>
+        <description>The six-story Campbell Library is home to nearly 400,000 books and multimedia, a selective Government Documents Depository, Rowan University Archives, Special Collections, and the RCA Heritage Museum. The Writing Center is housed on the first floor room 131. Departments:Sociology and Anthropology  Law and Justice&lt;br&gt;&lt;br&gt;Keywords: library, books, sociology, anthropology, law and justice, writing center, writing, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.709309,-75.118965</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>library, books, sociology, anthropology, law and justice, writing center, writing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.709309,-75.118965</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118965,39.709309,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Discovery Hall</name>
+        <description>Discovery Hall expands facilities for the School of Earth &amp; Environment and the College of Science &amp; Mathematics. Opened in September 2021, it includes 4 stories of 6 lecture-style classrooms, 6 active-learning classrooms, 4 chemistry labs, 2 biology labs, labs for faculty research, environmental science, and geology.Departments:Earth and EnvironmentScience and Mathmatics&lt;br&gt;&lt;br&gt;Keywords: research lab, biology lab, chemistry lab, environmental lab, classrooms, lecture, lounge, geology, geography, science, mathematics&lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.707781, -75.115499</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>research lab, biology lab, chemistry lab, environmental lab, classrooms, lecture, lounge, geology, geography, science, mathematics</value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.707781, -75.115499</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115499,39.707781,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Engineering Hall </name>
+        <description>Connected to the College's original Rowan Hall by a third-floor pedestrian bridge, Engineering Hall, opened 2017, is a gateway to the University's campus off Bowe Boulevard in Glassboro. The facility includes four classrooms, 19 research and teaching labs and 14 collaboration rooms. The building also includes a two-story dining/study/gathering space as well as outdoor space for students to study and meet.&lt;br&gt;&lt;br&gt;Keywords: Engineering, rowan, engineer, science, new building, food&lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.712971,-75.121864</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Engineering, rowan, engineer, science, new building, food</value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.712971,-75.121864</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121864,39.712971,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Enterprise Center</name>
+        <description>A mixed-use facility, the 53,000-square-foot Enterprise Center houses the College of Graduate and Continuing Education. It includes four floors of classrooms, lecture halls, a nursing experimental room, and administrative offices. The Enterprise Center also features 9,600 square feet of first-floor retail space and a 1,194-space, multi-level parking garage. Departments:NursingGlobal Learning &amp; Partnerships.&lt;br&gt;&lt;br&gt;Keywords: global learning, enterprise center, continuing education, graduate studies, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.70565,-75.113388</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>global learning, enterprise center, continuing education, graduate studies, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70565,-75.113388</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.113388,39.70565,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Esbjornson Gym</name>
+        <description>Esby Gym for short, this facility houses classrooms, Health &amp; Exercise Science faculty offices and a secondary pool and gym used by the Rowan Swim team.&lt;br&gt;&lt;br&gt;Keywords: health and exercise science, health, exercise, personal trainer, training, gym, pool, swim team, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.710922,-75.119049</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>health and exercise science, health, exercise, personal trainer, training, gym, pool, swim team, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.710922,-75.119049</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119049,39.710922,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Hawthorn Hall</name>
+        <description>Originally built as a residence hall, today Hawthorn Hall houses classrooms and faculty offices for the College of Communication &amp; Creative Arts and contains 27 offices, four classrooms and two conference rooms.&lt;br&gt;&lt;br&gt;Keywords: writing arts, classroom, communication studies, communication and creative arts, offices, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.708836,-75.121193</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>writing arts, classroom, communication studies, communication and creative arts, offices, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.708836,-75.121193</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121193,39.708836,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>James Hall</name>
+        <description>Home to the College of Education and named after Rowan University's 5th president. Dr. Herman D. James Hall features classrooms and faculty offices, as well as distance-learning facilities, the Early Childhood Demonstration Center and a variety of laboratory space and outreach centers. Departments: Educational Services &amp; LeadershipInterdisciplinary &amp; Inclusive EducationLanguage, Literacy, &amp; Sociocultural EducationScience, Technology, Engineering, Arts, and Math EducationHealth and Exercise Science.&lt;br&gt;&lt;br&gt;Keywords: Education, teaching, classrooms, James, James Hall, learning, college of education, lecture halls, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.711788,-75.119484</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Education, teaching, classrooms, James, James Hall, learning, college of education, lecture halls, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.711788,-75.119484</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119484,39.711788,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Memorial Hall</name>
+        <description>Memorial Hall houses several dance studios where dance rehearsals and classes take place. The building also houses information (computer) resources, the Help Desk, Web Services, and the Duplicating Center.&lt;br&gt;&lt;br&gt;Keywords: dance, dance studios, dance studio, rehearsals, dance class, help desk, nss workshop, computer help, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.707645,-75.119652</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>dance, dance studios, dance studio, rehearsals, dance class, help desk, nss workshop, computer help, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.707645,-75.119652</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119652,39.707645,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>R.O.T.C.</name>
+        <description>The Reserve Officers' Training Corps (ROTC) program provides students with leadership, management and basic military skills training. Students can receive scholarships and have the option of going on active duty or reserve duty after graduation with the National Guard or Army.&lt;br&gt;&lt;br&gt;Keywords: rotc, r.o.t.c., R.O.T.C, military, army reserve officers training corps, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.711525,-75.127136</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>rotc, r.o.t.c., R.O.T.C, military, army reserve officers training corps, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.711525,-75.127136</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.127136,39.711525,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Robinson Hall</name>
+        <description>Located in the center of campus, Robinson Hall is one of the largest classroom buildings on campus. The core of the building consists of classrooms and seminar rooms, though it also houses a small cafe stand and seating on the first floor. Departments: Computer ScienceSchool of Health ProfessionsHistoryMathematicsPolitical Science EconomicsPsychologyGeography, Planning, &amp; SustainabilityGeology&lt;br&gt;&lt;br&gt;Keywords: Classrooms, seminar rooms, general education, gen eds, liberal arts, liberal science, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.710606,-75.119972</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Classrooms, seminar rooms, general education, gen eds, liberal arts, liberal science, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.710606,-75.119972</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119972,39.710606,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Rowan Hall</name>
+        <description>Home to the Henry M. Rowan College of Engineering, 95,000-square-foot Rowan Hall features three floors of offices, classrooms, laboratories and the 115-seat Betty Rowan Auditorium.Departments: Biomedical EngineeringChemical EngineeringCivil and Environmental EngineeringElectrical and Computer EngineeringExperiential Engineering EducationMechanical Engineering.&lt;br&gt;&lt;br&gt;Keywords: engineering, rowan hall, rowan, offices, classrooms, labs, auditorium, engineering auditorium, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.712257,-75.122246</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>engineering, rowan hall, rowan, offices, classrooms, labs, auditorium, engineering auditorium, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.712257,-75.122246</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.122246,39.712257,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Science Hall</name>
+        <description>Three-story Science Hall features the 102-seat Edelman Planetarium, a rooftop observatory with a 16-inch telescope, 27 teaching laboratories and 22 research labs. Departments: Chemistry BiochemistryBiological SciencesMolecular &amp; Cellular BiosciencesPhysicsAstronomy.&lt;br&gt;&lt;br&gt;Keywords: Science, biology, chemistry, biochemistry, physics, astronomy, planetarium, labs, laboratory, research, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.710003,-75.12085</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Science, biology, chemistry, biochemistry, physics, astronomy, planetarium, labs, laboratory, research, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.710003,-75.12085</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.12085,39.710003,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Westby Hall</name>
+        <description>Westby Hall contains art studios for ceramics, sculpture, jewelry/metals, painting, printmaking and photography, computer labs, classrooms, a lecture hall for 110 students, exhibition galleries, and faculty offices.Departments:Art Department&lt;br&gt;&lt;br&gt;Keywords: Art, jewelry, ceramics, painting, sketching&lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.710152,-75.121529</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Art, jewelry, ceramics, painting, sketching</value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.710152,-75.121529</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121529,39.710152,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Whitney Center</name>
+        <description>A mixed-use facility located on Rowan Boulevard, Whitney Center includes living space and administrative space. The building houses up to 278 residents in single occupancy bedrooms in apartments housing one to four students. Each apartment includes a kitchen, breakfast nook, living room and bathroom, as well as access to laundry facilities and recreational spaces. Whitney Center is also home to the Bantivoglio Honors Program and contains offices, a lounge and classroom space.&lt;br&gt;&lt;br&gt;Keywords: Honors, apartments, honors concentration, housing, apartments, student housing, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.706696,-75.114624</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Honors, apartments, honors concentration, housing, apartments, student housing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706696,-75.114624</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.114624,39.706696,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Wilson Hall</name>
+        <description>Home to the College of Performing Arts, Wilson Hall contains the Dean of the College of Fine &amp; Performing Arts, two large rehearsal rooms, Boyd Recital Hall, practice rooms, classrooms, student lounges, a music library, faculty offices, the concert box office and W. Clarke Pfleeger Hall - a 1,000 seat auditorium. Departments:MusicTheatre and Dance&lt;br&gt;&lt;br&gt;Keywords: Theatre, performing arts, music, music performance, music education, dance, musical theatre, &lt;br&gt;Categories: Academic Buildings&lt;br&gt;Location: 39.711655,-75.121414</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Theatre, performing arts, music, music performance, music education, dance, musical theatre, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Academic Buildings</value>
+          </Data>
+          <Data name="Location">
+            <value>39.711655,-75.121414</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121414,39.711655,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Parking</name>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: 411 Ellis Street&lt;br&gt;Description: This lot is for commuter parking only. &lt;br&gt;Keywords: &lt;br&gt;Location: 39.701839,-75.120186</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>411 Ellis Street</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for commuter parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.701839,-75.120186</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.120186,39.701839,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: Lot A&lt;br&gt;Description: This lot is for commuter student parking only. &lt;br&gt;Keywords: &lt;br&gt;Location: 39.710728,-75.12394</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot A</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for commuter student parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.710728,-75.12394</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.12394,39.710728,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: Lot B-1&lt;br&gt;Description: This parking is for commuter parking only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.712505,-75.117332</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot B-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for commuter parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.712505,-75.117332</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.117332,39.712505,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: Lot C&lt;br&gt;Description: This lot is for commuter student parking only.&lt;br&gt;Keywords: commuter, parking, commuter parking, student, student parking, &lt;br&gt;Location: 39.714695,-75.119835</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot C</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for commuter student parking only.</value>
+          </Data>
+          <Data name="Keywords">
+            <value>commuter, parking, commuter parking, student, student parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.714695,-75.119835</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119835,39.714695,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: Lot D&lt;br&gt;Description: This lot is for commuter parking only. &lt;br&gt;Keywords: &lt;br&gt;Location: 39.714935,-75.121422</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot D</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for commuter parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.714935,-75.121422</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121422,39.714935,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: Lot D-1&lt;br&gt;Description: This lot is for commuter student parking only.&lt;br&gt;Keywords: parking, commuter, commuter parking, &lt;br&gt;Location: 39.713898,-75.122414</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot D-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for commuter student parking only.</value>
+          </Data>
+          <Data name="Keywords">
+            <value>parking, commuter, commuter parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.713898,-75.122414</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.122414,39.713898,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: Lot F-1&lt;br&gt;Description: This parking is for commuter parking only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.711666,-75.127014</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot F-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for commuter parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.711666,-75.127014</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.127014,39.711666,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: Lot O&lt;br&gt;Description: This lot is for commuter student parking only.&lt;br&gt;Keywords: commuter, student, commuter parking, student parking, &lt;br&gt;Location: 39.71291,-75.119278</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot O</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for commuter student parking only.</value>
+          </Data>
+          <Data name="Keywords">
+            <value>commuter, student, commuter parking, student parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.71291,-75.119278</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119278,39.71291,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: Lot R&lt;br&gt;Description: This lot is for commuter student parking only.&lt;br&gt;Keywords: commuter, parking, student parking, commuter parking, &lt;br&gt;Location: 39.705589,-75.120148</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot R</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for commuter student parking only.</value>
+          </Data>
+          <Data name="Keywords">
+            <value>commuter, parking, student parking, commuter parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.705589,-75.120148</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.120148,39.705589,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Commuter Parking</name>
+        <description>Name: Lot Y&lt;br&gt;Description: This lot is for commuter student parking only.&lt;br&gt;Keywords: commuter, student, commuter parking, student parking, parking, &lt;br&gt;Location: 39.706116,-75.122215</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot Y</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for commuter student parking only.</value>
+          </Data>
+          <Data name="Keywords">
+            <value>commuter, student, commuter parking, student parking, parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.706116,-75.122215</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.122215,39.706116,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot A-1&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.710938,-75.123619</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot A-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.710938,-75.123619</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.123619,39.710938,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot A-2&lt;br&gt;Description: This lot is for employee parking only. &lt;br&gt;Keywords: &lt;br&gt;Location: 39.709969,-75.121971</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot A-2</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for employee parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.709969,-75.121971</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121971,39.709969,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot C-1&lt;br&gt;Description: This lot is for employee parking only. &lt;br&gt;Keywords: &lt;br&gt;Location: 39.713909,-75.118591</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot C-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for employee parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.713909,-75.118591</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118591,39.713909,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot D-2&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: D-2, employee, parking, employee parking,&lt;br&gt;Location: 39.713699,-75.122063</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot D-2</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>D-2, employee, parking, employee parking,</value>
+          </Data>
+          <Data name="Location">
+            <value>39.713699,-75.122063</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.122063,39.713699,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot E&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: parking, employee, employee parking, &lt;br&gt;Location: 39.707592,-75.120766</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot E</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>parking, employee, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.707592,-75.120766</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.120766,39.707592,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot G&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.708736,-75.12162</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot G</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.708736,-75.12162</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.12162,39.708736,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot H&lt;br&gt;Description: This parking is for employees. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.708359,-75.119324</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot H</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.708359,-75.119324</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119324,39.708359,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot H-1&lt;br&gt;Description: This parking is for employees. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.707664,-75.118958</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot H-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.707664,-75.118958</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118958,39.707664,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot K&lt;br&gt;Description: This lot is for employee parking only. &lt;br&gt;Keywords: &lt;br&gt;Location: 39.708069,-75.115082</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot K</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for employee parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.708069,-75.115082</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115082,39.708069,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot M&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: parking, employee, employee parking, &lt;br&gt;Location: 39.711205,-75.11837</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot M</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>parking, employee, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.711205,-75.11837</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.11837,39.711205,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot N&lt;br&gt;Description: This lot is for employee parking only.&lt;br&gt;Keywords: &lt;br&gt;Location: 39.705402,-75.118538</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot N</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for employee parking only.</value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.705402,-75.118538</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118538,39.705402,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot O-1&lt;br&gt;Description: This lot is for employee parking only.&lt;br&gt;Keywords: parking, student, commuter, commuter student, commuter parking, &lt;br&gt;Location: 39.712482,-75.120453</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot O-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for employee parking only.</value>
+          </Data>
+          <Data name="Keywords">
+            <value>parking, student, commuter, commuter student, commuter parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.712482,-75.120453</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.120453,39.712482,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot O-2&lt;br&gt;Description: This lot is for employee parking only. &lt;br&gt;Keywords: &lt;br&gt;Location: 39.713387,-75.121529</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot O-2</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for employee parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.713387,-75.121529</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121529,39.713387,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot P&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.706028,-75.119339</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot P</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.706028,-75.119339</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119339,39.706028,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot S&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.706799,-75.118408</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot S</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.706799,-75.118408</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118408,39.706799,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot T&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.706547,-75.116379</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot T</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.706547,-75.116379</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116379,39.706547,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot U&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.708046,-75.116402</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot U</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.708046,-75.116402</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116402,39.708046,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot X&lt;br&gt;Description: This lot is for employee parking only.&lt;br&gt;Keywords: commuter, parking, commuter parking, student parking, student, &lt;br&gt;Location: 39.708141,-75.111946</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot X</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for employee parking only.</value>
+          </Data>
+          <Data name="Keywords">
+            <value>commuter, parking, commuter parking, student parking, student, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.708141,-75.111946</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.111946,39.708141,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Employee Parking</name>
+        <description>Name: Lot Z-1&lt;br&gt;Description: This parking is for employees only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.708317,-75.122017</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot Z-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for employees only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.708317,-75.122017</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.122017,39.708317,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Resident Parking</name>
+        <description>Name: Chestnut&lt;br&gt;Description: This lot is for resident student parking only. &lt;br&gt;Keywords: &lt;br&gt;Location: 39.710056,-75.113838</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Chestnut</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for resident student parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.710056,-75.113838</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.113838,39.710056,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Resident Parking</name>
+        <description>Name: Chestnut-1&lt;br&gt;Description: This lot is for resident parking only. &lt;br&gt;Keywords: &lt;br&gt;Location: 39.709057,-75.112541</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Chestnut-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is for resident parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Location">
+            <value>39.709057,-75.112541</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.112541,39.709057,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Resident Parking</name>
+        <description>Name: Edgewood Park Apartments Lot&lt;br&gt;Description: This parking is for resident student parking only. &lt;br&gt;Keywords: resident, student, parking, student parking, resident parking, edgewood, edgewood parking, &lt;br&gt;Location: 39.711109,-75.115341</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Edgewood Park Apartments Lot</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for resident student parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>resident, student, parking, student parking, resident parking, edgewood, edgewood parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.711109,-75.115341</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115341,39.711109,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Resident Parking</name>
+        <description>Name: Lot B&lt;br&gt;Description: This parking is for resident student parking only. &lt;br&gt;Keywords: parking, resident, resident student, resident parking, student parking, &lt;br&gt;Location: 39.712093,-75.116783</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot B</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for resident student parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>parking, resident, resident student, resident parking, student parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.712093,-75.116783</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116783,39.712093,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Resident Parking</name>
+        <description>Name: Lot F&lt;br&gt;Description: This parking is for resident student parking only. &lt;br&gt;Keywords: parking, student, student parking, resident, resident parking, &lt;br&gt;Location: 39.711468,-75.125099</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot F</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for resident student parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>parking, student, student parking, resident, resident parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.711468,-75.125099</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.125099,39.711468,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Resident Parking</name>
+        <description>Name: Lot J&lt;br&gt;Description: This parking is for resident student parking only. &lt;br&gt;Keywords: resident, parking, resident parking, student parking, student, &lt;br&gt;Location: 39.707764,-75.115562</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot J</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for resident student parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>resident, parking, resident parking, student parking, student, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.707764,-75.115562</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115562,39.707764,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Resident Parking</name>
+        <description>Name: Lot W&lt;br&gt;Description: This parking is for resident parking only. &lt;br&gt;Keywords: employee, parking, employee parking, &lt;br&gt;Location: 39.710365,-75.117538</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot W</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for resident parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>employee, parking, employee parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.710365,-75.117538</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.117538,39.710365,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Resident Parking</name>
+        <description>Name: Rowan Boulevard Garage&lt;br&gt;Description: This parking is for resident student parking only. &lt;br&gt;Keywords: resident, parking, student parking, resident parking, &lt;br&gt;Location: 39.705803,-75.112961</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Rowan Boulevard Garage</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for resident student parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>resident, parking, student parking, resident parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.705803,-75.112961</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.112961,39.705803,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Resident Parking</name>
+        <description>Name: Townhouse Garage&lt;br&gt;Description: This parking is for resident student parking only. &lt;br&gt;Keywords: parking, student, resident, resident parking, student parking, &lt;br&gt;Location: 39.708309,-75.123489</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Townhouse Garage</value>
+          </Data>
+          <Data name="Description">
+            <value>This parking is for resident student parking only. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>parking, student, resident, resident parking, student parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.708309,-75.123489</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.123489,39.708309,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Visitor Parking</name>
+        <description>Name: Lot H&lt;br&gt;Description: This lot is the campus visitor parking lot. &lt;br&gt;Keywords: visitor, parking, visitor parking, &lt;br&gt;Location: 39.708355, -75.119347</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot H</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is the campus visitor parking lot. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>visitor, parking, visitor parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.708355, -75.119347</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119347,39.708355,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Visitor Parking</name>
+        <description>Name: Lot H-1&lt;br&gt;Description: This lot is the campus visitor parking lot. &lt;br&gt;Keywords: visitor, parking, visitor parking, &lt;br&gt;Location: 39.707664,-75.118958</description>
+        <ExtendedData>
+          <Data name="Name">
+            <value>Lot H-1</value>
+          </Data>
+          <Data name="Description">
+            <value>This lot is the campus visitor parking lot. </value>
+          </Data>
+          <Data name="Keywords">
+            <value>visitor, parking, visitor parking, </value>
+          </Data>
+          <Data name="Location">
+            <value>39.707664,-75.118958</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118958,39.707664,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Residence Halls &amp; Apartments</name>
+      <Placemark>
+        <name>220 Rowan Boulevard</name>
+        <description>Nexus in 2015 opened 220 Rowan Boulevard, a 316,000 square-foot building with ground floor medical, dining and retail space and upper level student and market rate housing. Initial commercial tenants at 220 Rowan Boulevard include a seven-day per week Inspira Urgent Care facility, the Cooper Bone and Joint Institute, a branch of South Jersey Federal Credit Union and a Tony Luke's cheesesteak restaurant, and a 300-seat Chickie's &amp; Pete's sports bar and restaurant.&lt;br&gt;&lt;br&gt;Keywords: Housing, retail, dining, food, commercial, apartments&lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.70528,-75.113693</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Housing, retail, dining, food, commercial, apartments</value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70528,-75.113693</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.113693,39.70528,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>223 West High Street</name>
+        <description>A four story building with 144 student beds for upper classman housing. This building is suite style with each apartment providing bedrooms, a kitchen, bathrooms, and a living area.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.703445,-75.114006</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.703445,-75.114006</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.114006,39.703445,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>230 Victoria</name>
+        <description>Student housing on Victoria Street, 6 floors of housing holding 413 student beds. Each suite in this building consists of a single or double bedrooms, with up to 8 bedrooms per housing suite. Each suite shares a kitchen, a bathroom and a living area. The building also houses a recreation center, a parking garage, retail space, and classrooms and offices.Departments:Writing Arts Communication Studies&lt;br&gt;&lt;br&gt;Keywords: Writing Arts, Communication studies, parking, recreation, gym, housing, new housing, apartments, student housing, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.704281,-75.113571</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Writing Arts, Communication studies, parking, recreation, gym, housing, new housing, apartments, student housing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.704281,-75.113571</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.113571,39.704281,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Chestnut Hall</name>
+        <description>As one of 'The North Halls' comprised of Chestnut, Magnolia and Willow Halls, these buildings in all house 750 students. Students live in suites and share restroom facilities. Suites accommodate five to 16 students who share a lounge and common bathroom, both of which are cleaned by University Housing staff. The complex also features a laundry room.&lt;br&gt;&lt;br&gt;Keywords: north hall, housing, student housing, residence hall, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.709602,-75.113899</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>north hall, housing, student housing, residence hall, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.709602,-75.113899</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.113899,39.709602,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Edgewood Park Apartments</name>
+        <description>Edgewood Park Apartments consist of four separate buildings that are identical in structure. Each building has three floors each with 24 individual units and house up to 384 students. Apartments feature two bedrooms, a living room, dining room, kitchen, and bathroom. The apartments are furnished and air-conditioned. The individual apartments are designated same gender units and each building is co-ed.&lt;br&gt;&lt;br&gt;Keywords: housing, student housing, residence hall, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.710609,-75.115501</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>housing, student housing, residence hall, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.710609,-75.115501</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115501,39.710609,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Evergreen Hall</name>
+        <description>A three story residence hall, Evergreen accommodates 204 students housed in two bedroom suites that each include their own bathroom which each suite is responsible for cleaning. Laundry facilities are on each floor as well as study rooms and a lounge area featured on the first floor.&lt;br&gt;&lt;br&gt;Keywords: housing, student housing, residence hall, suite style, suite, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.707081,-75.116753</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>housing, student housing, residence hall, suite style, suite, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.707081,-75.116753</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116753,39.707081,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Holly Pointe Commons</name>
+        <description>Opened in 2016, this building houses 1,415 students. With 7 floors at its' highest and 4 floors at its' lowest, in addition to residential housing this building contains a convenience store, a Starbucks, and a Dining Hall to suit the needs of students, with Freshman and Sophomore aged students in mind. Bathrooms are floor-style and cleaned by Rowan University Staff, and rooms are in single or double occupancy.&lt;br&gt;&lt;br&gt;Keywords: Housing, student housing, freshman housing, sophomore housing, dorms, dormitories, floor style, learning communities, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.707336,-75.112366</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Housing, student housing, freshman housing, sophomore housing, dorms, dormitories, floor style, learning communities, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.707336,-75.112366</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.112366,39.707336,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>International House</name>
+        <description>Built in 1855 as a private residence, this stately home in the town of Glassboro serves as living quarters for international students and scholars.&lt;br&gt;&lt;br&gt;Keywords: international, international student, student housing, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.706161,-75.110207</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>international, international student, student housing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706161,-75.110207</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.110207,39.706161,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Laurel Hall</name>
+        <description>One the University's first residence halls, Laurel Hall houses up to 59 students. Each suite houses eight to 14 students who share a common hallway and community bathroom, both of which are cleaned by University Housing staff.&lt;br&gt;&lt;br&gt;Keywords: housing, student housing, dorms, dormitories, floor style, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.707268,-75.119255</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>housing, student housing, dorms, dormitories, floor style, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.707268,-75.119255</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119255,39.707268,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Magnolia Hall</name>
+        <description>Magnolia houses up to 201 residents on three floors. As one of 'The North Halls' comprised of Chestnut, Magnolia and Willow Halls, these buildings in all house 750 students. Students live in suites and share restroom facilities. Suites accommodate five to 16 students who share a lounge and common bathroom, both of which are cleaned by University Housing staff. The complex also features a laundry room.&lt;br&gt;&lt;br&gt;Keywords: housing, student housing, dorms, dormitories, suite, suite style, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.709641, -75.115036</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>housing, student housing, dorms, dormitories, suite, suite style, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.709641, -75.115036</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115036,39.709641,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mimosa Hall</name>
+        <description>Located in the center of campus, Mimosa Hall houses 315 students. Rooms are arranged by suites, and each suite contains two to three double bedrooms and a bathroom. Each suite shares a common bathroom, which students are responsible for cleaning. Mimosa also features laundry facilities on each floor as well as a computer lab.&lt;br&gt;&lt;br&gt;Keywords: dorm, housing, student housing, dormitories, suite, suite style, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.709827,-75.117538</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>dorm, housing, student housing, dormitories, suite, suite style, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.709827,-75.117538</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.117538,39.709827,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mullica Hall</name>
+        <description>Mullica Hall houses 104 residents. Each two-bedroom suite shares a common bathroom, which students are responsible for cleaning. Mullica also features laundry facilities and study rooms on each floor, with a lounge area on the first floor.&lt;br&gt;&lt;br&gt;Keywords: housing, dormitories, student housing, suite, suite style, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.707054,-75.115601</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>housing, dormitories, student housing, suite, suite style, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.707054,-75.115601</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115601,39.707054,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Oak Hall</name>
+        <description>One the University's first residence halls Oak Hall houses up to 59 students. Each suite houses eight to 14 students who share a common hallway and community bathroom, both of which are cleaned by University Housing staff.&lt;br&gt;&lt;br&gt;Keywords: housing, dormitories, student housing, floor style, floor, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.707088,-75.118561</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>housing, dormitories, student housing, floor style, floor, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.707088,-75.118561</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118561,39.707088,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Rowan Boulevard Apartments</name>
+        <description>The Rowan Boulevard apartments house up to 884 students in four-bedroom (single occupancy) apartments that include two bathrooms, a kitchen, breakfast nook and living room area. The complex also contains exercise and weight rooms, meeting rooms, laundry facilities and a Public Safety satellite office.&lt;br&gt;&lt;br&gt;Keywords: rowan boulevard, robo, apartment style, student housing, apartment, upper level housing, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.706146,-75.111923</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>rowan boulevard, robo, apartment style, student housing, apartment, upper level housing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706146,-75.111923</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.111923,39.706146,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Townhouses</name>
+        <description>The 113-unit townhouse complex houses up to 465 students living in single occupancy rooms in four- and six-bedroom configurations. Each townhouse features a living room, kitchen and bathroom. The complex also has a parking garage, community center and laundry facilities.&lt;br&gt;&lt;br&gt;Keywords: townhouses, student housing, upper level housing, university housing, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.709267,-75.122887</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>townhouses, student housing, upper level housing, university housing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.709267,-75.122887</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.122887,39.709267,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Triad Hall Apartments</name>
+        <description>Triad Apartments house up to 378 students in one-, two-, or three-bedroom configurations that feature a kitchen, living room and bathroom. Laundry facilities are on site.&lt;br&gt;&lt;br&gt;Keywords: housing, student housing, dormitories, apartment style, upper level housing, on campus housing, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.711826,-75.125755</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>housing, student housing, dormitories, apartment style, upper level housing, on campus housing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.711826,-75.125755</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.125755,39.711826,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Whitney Center</name>
+        <description>A mixed-use facility located on Rowan Boulevard, Whitney Center includes living space and administrative space. The building houses up to 278 residents in single occupancy bedrooms in apartments housing one to four students. Each apartment includes a kitchen, breakfast nook, living room and bathroom, as well as access to laundry facilities and recreational spaces. Whitney Center is also home to the Bantivoglio Honors Program and contains offices, a lounge and classroom space.&lt;br&gt;&lt;br&gt;Keywords: Honors, apartments, honors concentration, housing, apartments, student housing, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.706696,-75.114624</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Honors, apartments, honors concentration, housing, apartments, student housing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706696,-75.114624</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.114624,39.706696,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Willow Hall</name>
+        <description>Willow houses up to 203 residents on three floors. As one of 'The North Halls' comprised of Chestnut, Magnolia and Willow Halls, these buildings in all house 750 students. Students live in suites and share restroom facilities. Suites accommodate five to 16 students who share a lounge and common bathroom, both of which are cleaned by University Housing staff. The complex also features a laundry room.&lt;br&gt;&lt;br&gt;Keywords: housing, student housing, dormitories, &lt;br&gt;Categories: Residence Halls &amp; Apartments&lt;br&gt;Location: 39.709919,-75.116135</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>housing, student housing, dormitories, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Residence Halls &amp; Apartments</value>
+          </Data>
+          <Data name="Location">
+            <value>39.709919,-75.116135</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116135,39.709919,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Administrative &amp; Support Services</name>
+      <Placemark>
+        <name>301 West High Street</name>
+        <description>The three story building features the new Rowan University art gallery. It  features classrooms, faculty offices, computer labs and student lounge spaces. Departments:Public Relations &amp; Advertising&lt;br&gt;&lt;br&gt;Keywords: Journalism. PR, Public Relations, computer lab, advertising, faculty, art, gallery, art gallery, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.703812,-75.115105</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>Journalism. PR, Public Relations, computer lab, advertising, faculty, art, gallery, art gallery, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.703812,-75.115105</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115105,39.703812,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>6 E. High Street</name>
+        <description>Built in 1926, the former bank building is now home to the Dean's office for the College of Communication and Creative Arts and faculty for the Department of Journalism.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.702534,-75.111778</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.702534,-75.111778</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.111778,39.702534,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>600 Whitney Avenue</name>
+        <description>This building houses the Dean's office for the College of Earth and Environment as well as the Fossil Park Office.&lt;br&gt;&lt;br&gt;Keywords: earth and environment, dean's office, fossil park, fossil park office, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.705441,-75.118759</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>earth and environment, dean's office, fossil park, fossil park office, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.705441,-75.118759</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118759,39.705441,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Barnes &amp; Noble Bookstore</name>
+        <description>The University bookstore, Barnes &amp; Noble at Rowan Boulevard offers textbooks, school supplies and Rowan Pros apparel and features an in-store Starbucks.&lt;br&gt;&lt;br&gt;Keywords: bookstore, coffee, starbucks, recreation, reading, writing, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.70507,-75.112617</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>bookstore, coffee, starbucks, recreation, reading, writing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70507,-75.112617</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.112617,39.70507,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bole Hall</name>
+        <description>The administrative center of the university, Bole Hall houses the Office of the President and Office of the Provost and is named after former Dean Robert Bole.&lt;br&gt;&lt;br&gt;Keywords: president, provost, university president, staff, offices, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.706181,-75.120506</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>president, provost, university president, staff, offices, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706181,-75.120506</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.120506,39.706181,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Bole Hall Annex</name>
+        <description>Our Department of Public Safety and the University Research Office are located in Bole Hall Annex.&lt;br&gt;&lt;br&gt;Keywords: public safety, research, research office, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.70649,-75.119621</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>public safety, research, research office, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70649,-75.119621</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119621,39.70649,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Carriage House</name>
+        <description>Built in 1849 to service Hollybush Mansion, the Carriage House is now home to University Publications.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.706238,-75.118607</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706238,-75.118607</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118607,39.706238,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Cassady Facilities Building</name>
+        <description>The Otto P. Cassady Maintenance Building serves as the main office complex for maintenance operations.&lt;br&gt;&lt;br&gt;Keywords: facilities, maintenance, signs, sign shop, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.708252,-75.114815</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>facilities, maintenance, signs, sign shop, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.708252,-75.114815</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.114815,39.708252,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Chamberlain Student Center</name>
+        <description>A campus focal point where students gather for events and services, the Student Center stands three stories in the center of campus. The building features the information desk, student ID room, mailroom, an ATM, Eynon Ballroom, meeting and conference rooms, and eateries including the dining hall, food court, outdoor dining area, Owl's Nest restaurant, Prof Place convenience store and Starbucks.&lt;br&gt;&lt;br&gt;Keywords: food, dining, starbucks, dining hall, cafeteria, lounge area, lounge, food court, patio, seating, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.708828,-75.117798</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>food, dining, starbucks, dining hall, cafeteria, lounge area, lounge, food court, patio, seating, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.708828,-75.117798</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.117798,39.708828,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Courtyard Marriott Hotel/Conference Center</name>
+        <description>Located on Rowan Boulevard, Courtyard Marriott offers convenience for overnight visitors to Rowan and professionals seeking conference and meeting space.&lt;br&gt;&lt;br&gt;Keywords: mariott, hotel, out of town, stay night, conference rooms, meetings, business room, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.706627, -75.113571</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>mariott, hotel, out of town, stay night, conference rooms, meetings, business room, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706627, -75.113571</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.113571,39.706627,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Hering Heating Plant</name>
+        <description>Hering Heating Plant houses the centralized heating and co-generation equipment.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.708443,-75.116119</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.708443,-75.116119</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116119,39.708443,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Hollybush Mansion</name>
+        <description>Built in 1849, Hollybush Mansion was the site of the historic summit meeting between President Lyndon B. Johnson and Soviet Premier Alexei B. Kosygin in 1967. Now a museum and meeting center, visitors can examine displays that illustrate the building's restoration, the history of the glass industry in the area and the Summit.&lt;br&gt;&lt;br&gt;Keywords: hollybush, history, historic, president, museum, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.706287,-75.118004</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>hollybush, history, historic, president, museum, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706287,-75.118004</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118004,39.706287,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Interfaith and Spiritual Exploration Center </name>
+        <description>According to their site, the Interfaith and Spiritual Exploration Center aims to promote a campus environment that is inclusive of student's religious, spiritual, and secular identities and allows for expression and exploration of spiritual beliefs and values. Programs and initiatives of the Center will advance understanding and appreciation of the contributions of communities varying beliefs. Located on Floor 2 of Hawthorn Hall.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.708637,-75.121445</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.708637,-75.121445</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121445,39.708637,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>International House</name>
+        <description>Built in 1855 as a private residence, this stately home in the town of Glassboro serves as living quarters for international students and scholars.&lt;br&gt;&lt;br&gt;Keywords: international, international student, student housing, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.706161,-75.110207</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>international, international student, student housing, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706161,-75.110207</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.110207,39.706161,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>John Green Team House</name>
+        <description>Opened in 1971 a multi-million dollar renovation completed in 2013 expanded the Team House, a facility that features a training room, laundry and shower area and locker rooms for each team as well as intercollegiate athletics, coaching and staff offices.&lt;br&gt;&lt;br&gt;Keywords: sports, football, team house, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.713753,-75.118675</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>sports, football, team house, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.713753,-75.118675</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118675,39.713753,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>LGBTQIA+ Center </name>
+        <description>According to their site, the LGBTQIA+ Center is a resource for students who identify as Lesbian, Gay, Bisexual, Transgender, Queer/Questioning, Intersex, or Agender/Asexual.  The center intends to create safer spaces for students by supporting students' exploration of their identity, and advocate for campus inclusion for the LGBTQIA+ community at Rowan.  The staff of the Center works to fulfill its goals through advocacy for campus inclusion of the LGBTQIA+ community at Rowan and by providing relevant training opportunities to students, faculty, and staff.Located on Floor 2 of Hawthorn Hall.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.708736,-75.121315</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.708736,-75.121315</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121315,39.708736,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Multicultural Resource Center (MCRC)</name>
+        <description>According to their site, the Multicultural Resource Center is an evolution of the long established Office of Multicultural Affairs, whose services and programs are now housed in the Office of Social Justice, Inclusion &amp; Conflict Resolution. The Multicultural Center serves as a resource for students from diverse cultural and identity groups, and is intended to promote celebration of diversity, development of cross cultural understanding and competency, and inclusion of diverse people in the Rowan community.  The Center supports and initiates programs that promotes the acknowledgement and acceptance of the differences that define the self-identity of faculty, staff, and students. Its ongoing purpose is the pursuit of maintaining an environment that cultivates the ability for all constituencies of Rowan University to safely express those identities within the parameters of the institution's academic and social behavior expectations.Located on Floor 2 of Hawthorn Hall.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.708755,-75.121185</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.708755,-75.121185</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121185,39.708755,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Sangree Greenhouse</name>
+        <description>A majority of the beautiful flowers, trees and shrubbery that beautify our campus were first grown as seedlings in John Sangree Greenhouse. One of the oldest structures on campus, the greenhouse was originally built in 1923.&lt;br&gt;&lt;br&gt;Keywords: greenhouse, landscaping, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.70686,-75.119987</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>greenhouse, landscaping, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70686,-75.119987</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119987,39.70686,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Savitz Hall (Admissions)</name>
+        <description>The main hub for student services, Savitz Hall houses offices for the Vice President for Student Affairs, Dean of Students, Career Management Center, Developmental Education, Tutoring, Basic Skills/Testing, Admissions, EOF/MAP, Registrar, Financial Aid, Bursar, Residential Learning &amp; University Housing, Multicultural/International Affairs, Specialized Services, Honors Program and Women's Studies.&lt;br&gt;&lt;br&gt;Keywords: student resources, housing, financial aid, bursar, registrar, basic skills, testing, dean of students, career, career management, tutoring, tutor, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.709515,-75.119659</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>student resources, housing, financial aid, bursar, registrar, basic skills, testing, dean of students, career, career management, tutoring, tutor, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.709515,-75.119659</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119659,39.709515,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Shpeen Hall</name>
+        <description>Located on Academy Street in Glassboro, the former elementary school Shpeen Hall houses administrative offices, including the R. Grace Bagg Alumni Center and the Rowan Foundation. It is home to University Advancement, including Alumni Relations.&lt;br&gt;&lt;br&gt;Keywords: shpeen, administrative, admin, offices, alumni, alumni relations, rowan foundation, university advancement, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.703869,-75.109184</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>shpeen, administrative, admin, offices, alumni, alumni relations, rowan foundation, university advancement, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.703869,-75.109184</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.109184,39.703869,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>South Jersey Technology Park </name>
+        <description>Located on Route 322 (Mullica Hill Road) near the junction of Rt. 55 in Mantua Township, SJTP provides competitively priced, class 'A' facilities for start-up and established companies that bring innovative technologies to the marketplace, and serves as a home for technology-focused researchers, inventors, entrepreneurs, professors and students. The recently completed Samuel H. Jones Innovation Center is the first of 25 planned buildings.The Samuel H. Jones Innovation Center is a 45,000 square-foot LEED Certified building with approximately 22,500 square feet devoted to laboratory and office space for academic research and 22,500 square feet available for private tenants, including Rowan's Technology Business Incubator for startup companies. Current tenants of the Samuel H. Jones Innovation Center include the Rowan College of Business incubator, and Rowan College of Engineering research laboratories.&lt;br&gt;&lt;br&gt;Keywords: technology, research, tech park, sj tech park, south jersey technology park, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.719616,-75.145424</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>technology, research, tech park, sj tech park, south jersey technology park, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.719616,-75.145424</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.145424,39.719616,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Winans Hall</name>
+        <description>Home to Rowan's Wellness Center, Winans Hall contains Student Health Services, Counseling &amp; Psychological Services, Healthy Campus Initiatives, Alcohol and Other Drug counseling services and emergency services.&lt;br&gt;&lt;br&gt;Keywords: winans, student health, health services, counseling, drug counseling, alcohol counseling, &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.70842,-75.116959</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>winans, student health, health services, counseling, drug counseling, alcohol counseling, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70842,-75.116959</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116959,39.70842,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Women's Center </name>
+        <description>According to their site, the Women's Center in the Office of Social Justice, Inclusion and Conflict Resolution exists to promote gender inclusivity and equity in our university community, and where individuals are empowered to grow in their understanding of gender-identity, social justice, and the skills needed to lead a more just society.Located on Floor 2 of Hawthorn Hall.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Administrative &amp; Support&lt;br&gt;Location: 39.708637,-75.121231</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Administrative &amp; Support</value>
+          </Data>
+          <Data name="Location">
+            <value>39.708637,-75.121231</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121231,39.708637,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Athletics</name>
+      <Placemark>
+        <name>Baseball Field </name>
+        <description>For use by baseball team, this field called 'The Nest' is located near Bunce and Bozorth Halls.&lt;br&gt;&lt;br&gt;Keywords: baseball, baseball field, team, sport, athletics, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.706989,-75.121979</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>baseball, baseball field, team, sport, athletics, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706989,-75.121979</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121979,39.706989,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Basketball Courts </name>
+        <description>Located near several residence halls, these outdoor courts are open for use.&lt;br&gt;&lt;br&gt;Keywords: basketball, courts, basketball courts, outdoor courts, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.7094,-75.116776</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>basketball, courts, basketball courts, outdoor courts, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.7094,-75.116776</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116776,39.7094,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Basketball Courts </name>
+        <description>These courts outside of Mullica Hall are available to students as a place to shoot hoops.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.70726,-75.115906</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70726,-75.115906</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115906,39.70726,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Esbjornson Gym</name>
+        <description>Esby Gym for short, this facility houses classrooms, Health &amp; Exercise Science faculty offices and a secondary pool and gym used by the Rowan Swim team.&lt;br&gt;&lt;br&gt;Keywords: health and exercise science, health, exercise, personal trainer, training, gym, pool, swim team, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.710922,-75.119049</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>health and exercise science, health, exercise, personal trainer, training, gym, pool, swim team, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.710922,-75.119049</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119049,39.710922,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Intramural Turf Field </name>
+        <description>Field is available for use by Students, Faculty/Staff and Recreation Center members for informal recreation during designated hours and scheduled events. All patrons must show a Rowan University ID to enter the facility.&lt;br&gt;&lt;br&gt;Keywords: field, intramural, multi use, team, sports, rugby, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.710388,-75.116791</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>field, intramural, multi use, team, sports, rugby, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.710388,-75.116791</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116791,39.710388,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>John Green Team House</name>
+        <description>Opened in 1971 a multi-million dollar renovation completed in 2013 expanded the Team House, a facility that features a training room, laundry and shower area and locker rooms for each team as well as intercollegiate athletics, coaching and staff offices.&lt;br&gt;&lt;br&gt;Keywords: sports, football, team house, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.713753, -75.118675</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>sports, football, team house, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.713753, -75.118675</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118675,39.713753,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Practice Fields (West Campus)</name>
+        <description>Situated on 17.5 acres on Route 322 across from the South Jersey Technology Park at Rowan University, the practice facility includes two fields for Prof football, soccer, field hockey and lacrosse athletes. One of the fields will be dedicated to the football and men's and women's soccer teams. The other field is for Rowan field hockey and lacrosse teams.&lt;br&gt;&lt;br&gt;Keywords: practice, practice fields, soccer, football, west, west campus, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.715992,-75.145821</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>practice, practice fields, soccer, football, west, west campus, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.715992,-75.145821</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.145821,39.715992,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Rec Center</name>
+        <description>Located on the Glassboro campus, the Rec is a 92,000-sq.-ft. health club open year-round that offers recreational activities, fitness programs, intramural sports and instructional classes.&lt;br&gt;&lt;br&gt;Keywords: gym, exercise, weights, cardio, indoor track, pool, track, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.710632,-75.118156</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>gym, exercise, weights, cardio, indoor track, pool, track, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.710632,-75.118156</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118156,39.710632,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Richard Wackar Stadium </name>
+        <description>The stadium includes aluminum seating, a scoreboard, press box, and an elevator to assist physically challenged fans. Certain equipment as well as the required University staff to operate it can be easily added a rental package for some events, such the press box, the sound system, and the score board.&lt;br&gt;&lt;br&gt;Keywords: football, lacrosse, stadium, profs, team, sports, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.714104,-75.120438</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>football, lacrosse, stadium, profs, team, sports, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.714104,-75.120438</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.120438,39.714104,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Rowan University Fitness Center</name>
+        <description>This new fitness center opened in 2017 features cardio machines such as ellipticals, stationary bikes, Stair Masters, in addition to weights and a fully functioning weight room.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.704273,-75.113762</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.704273,-75.113762</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.113762,39.704273,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Sand Volleyball Court </name>
+        <description>The sand volleyball court, next to the basketball courts, are open for use.&lt;br&gt;&lt;br&gt;Keywords: volleyball, sports, recreation, exercise, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.709339,-75.116371</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>volleyball, sports, recreation, exercise, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.709339,-75.116371</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.116371,39.709339,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Soccer Field </name>
+        <description>This field is used for the soccer team.&lt;br&gt;&lt;br&gt;Keywords: soccer, team, field, soccer field, sports, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.711628,-75.117752</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>soccer, team, field, soccer field, sports, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.711628,-75.117752</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.117752,39.711628,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Softball Field </name>
+        <description>The field used for softball games and practice.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.712139,-75.118629</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.712139,-75.118629</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118629,39.712139,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Tennis Courts </name>
+        <description>Located next to the John Green Teamhouse, these outdoor tennis courts are open for use.&lt;br&gt;&lt;br&gt;Keywords: tennis, courts, tennis courts, team, sport, exercise, &lt;br&gt;Categories: Athletics&lt;br&gt;Location: 39.713367,-75.118202</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>tennis, courts, tennis courts, team, sport, exercise, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Athletics</value>
+          </Data>
+          <Data name="Location">
+            <value>39.713367,-75.118202</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118202,39.713367,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Outdoor Spaces</name>
+      <Placemark>
+        <name>Bunce Green</name>
+        <description>Located outside Bunce Hall, Bunce Green includes both the stairs to the oldest building on campus, as well as a grassy area in the front of the building. This building is where commencement ceremonies take place.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Outdoor Spaces&lt;br&gt;Location: 39.706577, -75.121269</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Outdoor Spaces</value>
+          </Data>
+          <Data name="Location">
+            <value>39.706577, -75.121269</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121269,39.706577,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Engineering Hall Patio</name>
+        <description>Outside of Engineering Hall, there is a patio area with tables and chairs for outdoor seating.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Outdoor Spaces&lt;br&gt;Location: 39.712563,-75.121902</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Outdoor Spaces</value>
+          </Data>
+          <Data name="Location">
+            <value>39.712563,-75.121902</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.121902,39.712563,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Glassboro Town Square</name>
+        <description>This park located at the end of Rowan Boulevard on the corner of High and Main streets provides for students to walk through between campus and the shops and restaurants on High Street. The park features a veteran's memorial, a fire pit and lawn space with artificial hills.&lt;br&gt;&lt;br&gt;Keywords: park, town square, glassboro, &lt;br&gt;Categories: Outdoor Spaces&lt;br&gt;Location: 39.703266,-75.11232</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>park, town square, glassboro, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Outdoor Spaces</value>
+          </Data>
+          <Data name="Location">
+            <value>39.703266,-75.11232</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.11232,39.703266,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Laurel, and Oak Hall Intersection</name>
+        <description>This intersection between Laurel and Oak halls has several benches available to sit on and enjoy the various trees and grassy areas.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Outdoor Spaces&lt;br&gt;Location: 39.70697,-75.119041</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Outdoor Spaces</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70697,-75.119041</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119041,39.70697,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Magnolia Hall Gazebo</name>
+        <description>This gazebo located outside Magnolia Hall is used frequently as a hang out for students. The gazebo is well lit at night.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Outdoor Spaces&lt;br&gt;Location: 39.709274,-75.115181</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Outdoor Spaces</value>
+          </Data>
+          <Data name="Location">
+            <value>39.709274,-75.115181</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.115181,39.709274,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Memorial Circle</name>
+        <description>Located between Hawthorn, Bunce, and Memorial Halls, this green space offers various benches and sidewalks for easy access to each building, as well as places for relaxation.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Outdoor Spaces&lt;br&gt;Location: 39.7085,-75.120682</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Outdoor Spaces</value>
+          </Data>
+          <Data name="Location">
+            <value>39.7085,-75.120682</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.120682,39.7085,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Robinson Green </name>
+        <description>A green space that incorporates sustainability and recycled materials, Robinson Green offers guests a beautifully landscaped area to peruse and enjoy.&lt;br&gt;&lt;br&gt;Keywords: green, green space, robinson green, &lt;br&gt;Categories: Outdoor Spaces&lt;br&gt;Location: 39.711128,-75.119804</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value>green, green space, robinson green, </value>
+          </Data>
+          <Data name="Categories">
+            <value>Outdoor Spaces</value>
+          </Data>
+          <Data name="Location">
+            <value>39.711128,-75.119804</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.119804,39.711128,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Rowan Hall Lake </name>
+        <description>The lake behind Rowan Hall offers outdoor seating for people to enjoy, as well as a short walking or biking trail through the trees.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Outdoor Spaces&lt;br&gt;Location: 39.711964,-75.122719</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Outdoor Spaces</value>
+          </Data>
+          <Data name="Location">
+            <value>39.711964,-75.122719</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.122719,39.711964,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Student Center Patio</name>
+        <description>Located in the back of the Chamberlain Student Center, this patio offers outdoor seating and tables for eating.&lt;br&gt;&lt;br&gt;Keywords: &lt;br&gt;Categories: Outdoor Spaces&lt;br&gt;Location: 39.70911,-75.118271</description>
+        <ExtendedData>
+          <Data name="Keywords">
+            <value />
+          </Data>
+          <Data name="Categories">
+            <value>Outdoor Spaces</value>
+          </Data>
+          <Data name="Location">
+            <value>39.70911,-75.118271</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.118271,39.70911,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    </Document>
+</kml>

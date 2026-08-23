@@ -21,6 +21,20 @@ NEW -- {{ counts.new }} announcement{{ '' if counts.new == 1 else 's' }}
 {% if item.event %}
 EVENT: {% if item.event.name %}{{ item.event.name }}{% endif %}{% if item.event.when %} -- {{ item.event.when }}{% endif %}{% if item.event.location %} -- {{ item.event.location }}{% endif %}
 {% endif %}
+{% if item.parking %}
+
+PARKING LOCATION{{ 'S' if item.parking|length > 1 else '' }}
+{% for spot in item.parking %}
+{% if spot.resolved %}
+  {{ spot.heading }} -- {{ spot.description }}
+  Map: {{ spot.map_url }}
+{% else %}
+  {{ spot.matched_text }}: parking location could not be resolved automatically.
+  Official {{ spot.fallback_map_label }}: {{ spot.fallback_map_url }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
 {{ item.body_text }}
 {% for line in item.meta_lines %}
 {{ line.label }} {{ line.value }}
@@ -41,6 +55,20 @@ STANDING -- {{ counts.standing }} continuing announcement{{ '' if counts.standin
 {% if item.event %}
 EVENT: {% if item.event.name %}{{ item.event.name }}{% endif %}{% if item.event.when %} -- {{ item.event.when }}{% endif %}{% if item.event.location %} -- {{ item.event.location }}{% endif %}
 {% endif %}
+{% if item.parking %}
+
+PARKING LOCATION{{ 'S' if item.parking|length > 1 else '' }}
+{% for spot in item.parking %}
+{% if spot.resolved %}
+  {{ spot.heading }} -- {{ spot.description }}
+  Map: {{ spot.map_url }}
+{% else %}
+  {{ spot.matched_text }}: parking location could not be resolved automatically.
+  Official {{ spot.fallback_map_label }}: {{ spot.fallback_map_url }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
 {{ item.body_text }}
 {% for line in item.meta_lines %}
 {{ line.label }} {{ line.value }}

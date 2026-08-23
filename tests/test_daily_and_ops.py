@@ -477,18 +477,45 @@ def test_artifact_retention_respects_keep_minimum(settings_obj):
 def plan(tmp_path):
     return systemd_units.build_plan(
         working_dir=Path("/home/sedlock/src/DailyMail"),
-        send_time="07:00",
+        send_time="06:30",
         timezone="America/New_York",
         credentials_path=Path("/home/sedlock/.config/dailymail/credentials.env"),
         directory=tmp_path / "units",
     )
 
 
-def test_timer_schedules_seven_am_eastern_persistently(plan):
-    assert "OnCalendar=*-*-* 07:00:00 America/New_York" in plan.timer_text
+def test_timer_schedules_six_thirty_eastern_persistently(plan):
+    assert "OnCalendar=*-*-* 06:30:00 America/New_York" in plan.timer_text
     assert "Persistent=true" in plan.timer_text
     assert "WantedBy=timers.target" in plan.timer_text
     assert "Unit=dailymail.service" in plan.timer_text
+
+
+def test_timer_has_no_jitter_and_tight_accuracy(plan):
+    """06:30 means 06:30: no RandomizedDelaySec directive, one second of slack."""
+    directives = [
+        line for line in plan.timer_text.splitlines()
+        if line and not line.startswith("#")
+    ]
+    assert not any(line.startswith("RandomizedDelaySec") for line in directives)
+    assert "AccuracySec=1s" in directives
+    assert "Persistent=true" in directives
+
+
+def test_no_seven_am_schedule_remains(plan):
+    assert "07:00" not in plan.timer_text
+    assert "07:00" not in plan.service_text
+
+
+def test_the_default_configuration_schedules_six_thirty(tmp_path, monkeypatch):
+    from dailymail import settings as settings_module
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    settings_module.ensure_config()
+    settings = settings_module.load()
+    assert settings.daily_send_time == "06:30"
+    assert settings.timezone == "America/New_York"
+    assert 'daily_send_time = "06:30"' in settings_module.config_path().read_text()
 
 
 def test_service_uses_absolute_paths_and_working_directory(plan):

@@ -93,7 +93,7 @@ send_retries = 3
 
 [schedule]
 timezone = "America/New_York"
-daily_send_time = "07:00"
+daily_send_time = "06:30"
 
 [curation]
 # Executable is resolved via PATH if not absolute. systemd's PATH is minimal, so
@@ -103,6 +103,32 @@ claude_executable = "{claude_executable}"
 model = "sonnet"
 timeout_seconds = 240
 enabled = true
+
+[parking]
+# Parking-location enrichment. Reference data lives in SQLite and is refreshed
+# rarely; a normal cached day costs no network call and no Claude call.
+enabled = true
+# Refresh an authoritative source only when it has not been verified this long.
+refresh_after_days = 180
+# Refresh the campus source immediately when a parking mention misses the cache.
+refresh_on_miss = true
+# The targeted resolver is the last resort for a lot no source knows. It is the
+# only parking path granted web access, and never sees curation context.
+resolver_enabled = true
+resolver_timeout_seconds = 300
+# Model for reference-data generation and targeted resolution. Not the curation
+# model setting: these are separate invocations with separate tool policy.
+model = "sonnet"
+# Cached plain-English descriptions are written by a no-tools Claude call from
+# collected authoritative evidence, then validated before being stored.
+descriptions_enabled = true
+description_timeout_seconds = 300
+description_batch = 10
+# Do not enrich from a record cached below this confidence; show the official
+# campus parking map instead.
+min_confidence = "medium"
+# Cap the callouts on a single announcement so a lot list cannot dominate it.
+max_callouts = 6
 
 [images]
 # Inline data: URI images are decoded, downscaled and re-embedded as CID parts.
@@ -173,6 +199,17 @@ class Settings:
     collection_artifacts_days: int
     page_size: int
     retry_delays_seconds: tuple[int, ...]
+    parking_enabled: bool = True
+    parking_refresh_days: int = 180
+    parking_refresh_on_miss: bool = True
+    parking_resolver_enabled: bool = True
+    parking_resolver_timeout_seconds: int = 300
+    parking_model: str = "sonnet"
+    parking_descriptions_enabled: bool = True
+    parking_description_timeout_seconds: int = 300
+    parking_description_batch: int = 10
+    parking_min_confidence: str = "medium"
+    parking_max_callouts: int = 6
     category_priority: tuple[str, ...] = field(default=())
     locked_category_count: int = LOCKED_CATEGORY_COUNT
 
@@ -234,6 +271,7 @@ def load(path: Path | None = None) -> Settings:
     retention = raw.get("retention", {})
     collector = raw.get("collector", {})
     categories = raw.get("categories", {})
+    parking_cfg = raw.get("parking", {})
 
     priority = tuple(categories.get("priority") or DEFAULT_CATEGORY_PRIORITY)
 
@@ -246,7 +284,7 @@ def load(path: Path | None = None) -> Settings:
         smtp_timeout_seconds=int(email.get("smtp_timeout_seconds", 60)),
         send_retries=int(email.get("send_retries", 3)),
         timezone=schedule.get("timezone", "America/New_York"),
-        daily_send_time=schedule.get("daily_send_time", "07:00"),
+        daily_send_time=schedule.get("daily_send_time", "06:30"),
         claude_executable=curation.get("claude_executable")
         or _default_claude_executable(),
         claude_model=curation.get("model", "sonnet"),
@@ -269,6 +307,23 @@ def load(path: Path | None = None) -> Settings:
         retry_delays_seconds=tuple(
             collector.get("retry_delays_seconds", [300, 900])
         ),
+        parking_enabled=bool(parking_cfg.get("enabled", True)),
+        parking_refresh_days=int(parking_cfg.get("refresh_after_days", 180)),
+        parking_refresh_on_miss=bool(parking_cfg.get("refresh_on_miss", True)),
+        parking_resolver_enabled=bool(parking_cfg.get("resolver_enabled", True)),
+        parking_resolver_timeout_seconds=int(
+            parking_cfg.get("resolver_timeout_seconds", 300)
+        ),
+        parking_model=parking_cfg.get("model") or curation.get("model", "sonnet"),
+        parking_descriptions_enabled=bool(
+            parking_cfg.get("descriptions_enabled", True)
+        ),
+        parking_description_timeout_seconds=int(
+            parking_cfg.get("description_timeout_seconds", 300)
+        ),
+        parking_description_batch=int(parking_cfg.get("description_batch", 10)),
+        parking_min_confidence=str(parking_cfg.get("min_confidence", "medium")),
+        parking_max_callouts=int(parking_cfg.get("max_callouts", 6)),
         category_priority=priority,
         locked_category_count=int(
             categories.get("locked_count", LOCKED_CATEGORY_COUNT)

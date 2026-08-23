@@ -1,0 +1,37 @@
+{#- Parking location callout. Included from announcement.html.j2 with `item` in
+    scope. Additive only: it sits between the announcement's metadata and its
+    original body, and never alters the announcement text.
+
+    Outlook-safe: nested presentation tables, every style inline, no flexbox, no
+    background image, no web font. Rowan brown supplies the label and the link;
+    gold is a 3px left rule only, so the block reads as a note rather than
+    competing with the NEW/UPDATED badges above it. -#}
+{%- if item.parking %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:9px 0 3px 0;">
+      <tr><td style="background:#faf7f2;border-left:3px solid #FFCC00;padding:8px 11px 9px 11px;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;">
+        <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;font-weight:bold;color:#57150B;letter-spacing:1.2px;padding:0 0 3px 0;">
+          PARKING LOCATION{% if item.parking|length > 1 %}S{% endif %}
+        </div>
+        {%- for spot in item.parking %}
+        {%- if not loop.first %}
+        <div style="border-top:1px solid #ece5d8;font-size:0;line-height:0;height:1px;margin:7px 0 6px 0;">&nbsp;</div>
+        {%- endif %}
+        {%- if spot.resolved %}
+        <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:14px;line-height:1.35;font-weight:bold;color:#1a1a1a;">{{ spot.heading }}</div>
+        <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;line-height:1.45;color:#3a3a3a;padding:1px 0 0 0;">{{ spot.description }}</div>
+        <div style="padding:5px 0 0 0;">
+          <a href="{{ spot.map_url }}" target="_blank" rel="noopener noreferrer"
+             style="display:inline-block;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;font-weight:bold;color:#57150B;text-decoration:underline;padding:6px 2px 6px 0;">Open in Google Maps &rsaquo;</a>
+        </div>
+        {%- else %}
+        <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;line-height:1.45;color:#3a3a3a;">
+          Parking location could not be resolved automatically.
+          <a href="{{ spot.fallback_map_url }}" target="_blank" rel="noopener noreferrer"
+             style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;font-weight:bold;color:#57150B;text-decoration:underline;">View the official {{ spot.fallback_map_label }}&nbsp;&rsaquo;</a>
+        </div>
+        {%- endif %}
+        {%- endfor %}
+      </td></tr>
+    </table>
+
+{% endif %}

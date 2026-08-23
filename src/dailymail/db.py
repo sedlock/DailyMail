@@ -18,7 +18,7 @@ from pathlib import Path
 
 from .settings import data_dir
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 BUSY_TIMEOUT_MS = 10_000
 
 OFFICIAL_URL_TEMPLATE = (
@@ -187,6 +187,129 @@ CREATE INDEX IF NOT EXISTS idx_distdates_date
     ON distribution_dates (distribution_date);
 """
 
+# --- schema v2: durable parking reference data -------------------------------
+#
+# Separate from the announcement tables on purpose. Parking geography is
+# *reference* data: it changes on the scale of years, it is shared across every
+# announcement, and it is never derived from a single day's collection. Keeping
+# it in its own tables means a parking refresh can never touch announcement
+# history, and announcement retention can never drop a lot.
+PARKING_SCHEMA = """
+CREATE TABLE IF NOT EXISTS parking_sources (
+    source_id         TEXT PRIMARY KEY,
+    campus            TEXT NOT NULL,
+    source_type       TEXT NOT NULL,
+    source_url        TEXT NOT NULL,
+    source_map_id     TEXT,
+    machine_readable  INTEGER NOT NULL DEFAULT 0,
+    fingerprint       TEXT,
+    source_version    TEXT,
+    last_retrieved_at TEXT,
+    last_verified_at  TEXT,
+    last_changed_at   TEXT,
+    last_status       TEXT,
+    last_error        TEXT,
+    locations_seen    INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS parking_locations (
+    location_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    canonical_id        TEXT NOT NULL UNIQUE,
+    campus              TEXT NOT NULL,
+    canonical_name      TEXT NOT NULL,
+    normalized_name     TEXT NOT NULL,
+    location_type       TEXT NOT NULL,
+    permit_class        TEXT NOT NULL DEFAULT 'Unknown',
+    description         TEXT,
+    latitude            REAL,
+    longitude           REAL,
+    source_id           TEXT,
+    source_type         TEXT,
+    source_url          TEXT,
+    source_map_id       TEXT,
+    source_fingerprint  TEXT,
+    provenance          TEXT,
+    confidence          TEXT NOT NULL DEFAULT 'low',
+    is_active           INTEGER NOT NULL DEFAULT 1,
+    manual_override     INTEGER NOT NULL DEFAULT 0,
+    override_fields     TEXT,
+    description_method  TEXT,
+    description_model   TEXT,
+    first_discovered_at TEXT NOT NULL,
+    last_verified_at    TEXT NOT NULL,
+    last_changed_at     TEXT NOT NULL,
+    UNIQUE (campus, normalized_name)
+);
+
+CREATE TABLE IF NOT EXISTS parking_aliases (
+    alias_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_id      INTEGER NOT NULL
+                       REFERENCES parking_locations(location_id) ON DELETE CASCADE,
+    campus           TEXT NOT NULL,
+    alias            TEXT NOT NULL,
+    normalized_alias TEXT NOT NULL,
+    scannable        INTEGER NOT NULL DEFAULT 0,
+    origin           TEXT NOT NULL DEFAULT 'generated',
+    created_at       TEXT NOT NULL,
+    UNIQUE (campus, normalized_alias)
+);
+
+CREATE TABLE IF NOT EXISTS announcement_parking_locations (
+    target_date      TEXT NOT NULL,
+    submission_id    INTEGER NOT NULL
+                       REFERENCES announcements(submission_id) ON DELETE CASCADE,
+    normalized_match TEXT NOT NULL,
+    version_id       INTEGER,
+    location_id      INTEGER
+                       REFERENCES parking_locations(location_id) ON DELETE SET NULL,
+    matched_text     TEXT NOT NULL,
+    match_method     TEXT NOT NULL,
+    confidence       TEXT,
+    campus_hint      TEXT NOT NULL DEFAULT '',
+    resolved_at      TEXT NOT NULL,
+    PRIMARY KEY (target_date, submission_id, normalized_match)
+);
+
+CREATE TABLE IF NOT EXISTS parking_unresolved (
+    normalized_match TEXT NOT NULL,
+    campus_hint      TEXT NOT NULL DEFAULT '',
+    matched_text     TEXT NOT NULL,
+    attempts         INTEGER NOT NULL DEFAULT 0,
+    resolver_calls   INTEGER NOT NULL DEFAULT 0,
+    last_reason      TEXT,
+    first_seen_at    TEXT NOT NULL,
+    last_seen_at     TEXT NOT NULL,
+    PRIMARY KEY (normalized_match, campus_hint)
+);
+
+-- Named campus features from the same authoritative layers as the lots. Cached
+-- so campus disambiguation ("Lot A beside Rowan Medicine") works every morning
+-- without refetching anything.
+CREATE TABLE IF NOT EXISTS parking_landmarks (
+    landmark_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    campus          TEXT NOT NULL,
+    name            TEXT NOT NULL,
+    normalized_name TEXT NOT NULL,
+    category        TEXT,
+    latitude        REAL NOT NULL,
+    longitude       REAL NOT NULL,
+    source_id       TEXT,
+    last_verified_at TEXT NOT NULL,
+    UNIQUE (campus, normalized_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_parking_alias_lookup
+    ON parking_aliases (normalized_alias);
+CREATE INDEX IF NOT EXISTS idx_parking_landmarks_name
+    ON parking_landmarks (normalized_name);
+CREATE INDEX IF NOT EXISTS idx_parking_alias_scan
+    ON parking_aliases (scannable);
+CREATE INDEX IF NOT EXISTS idx_parking_locations_campus
+    ON parking_locations (campus, is_active);
+CREATE INDEX IF NOT EXISTS idx_announcement_parking_date
+    ON announcement_parking_locations (target_date);
+"""
+
 
 def now_utc() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -279,14 +402,39 @@ def transaction(connection: sqlite3.Connection):
         connection.commit()
 
 
+def _column_names(connection: sqlite3.Connection, table: str) -> set[str]:
+    return {
+        row["name"] for row in connection.execute(f"PRAGMA table_info({table})")
+    }
+
+
+def _upgrade_to_v2(connection: sqlite3.Connection) -> None:
+    """Add the parking reference tables and the per-run parking metrics column.
+
+    Idempotent and additive: every statement is `IF NOT EXISTS` or guarded, no
+    existing table is rewritten, and no announcement history is touched. Runs
+    inside the caller's transaction so a failure leaves v1 intact.
+    """
+    connection.executescript(PARKING_SCHEMA)
+    if "parking_stats" not in _column_names(connection, "runs"):
+        connection.execute("ALTER TABLE runs ADD COLUMN parking_stats TEXT")
+
+
+# Applied in ascending order for any version below SCHEMA_VERSION. Each entry
+# must be safe to run against an already-upgraded database.
+MIGRATIONS = {2: _upgrade_to_v2}
+
+
 def initialize(connection: sqlite3.Connection) -> int:
-    """Create the schema if needed and return the schema version."""
+    """Create or upgrade the schema and return the schema version."""
     with transaction(connection):
         connection.executescript(SCHEMA)
         row = connection.execute(
             "SELECT value FROM schema_meta WHERE key = 'schema_version'"
         ).fetchone()
         if row is None:
+            for target in sorted(MIGRATIONS):
+                MIGRATIONS[target](connection)
             connection.execute(
                 "INSERT INTO schema_meta (key, value) VALUES ('schema_version', ?)",
                 (str(SCHEMA_VERSION),),
@@ -304,6 +452,20 @@ def initialize(connection: sqlite3.Connection) -> int:
                     f"database schema version {version} is newer than this build "
                     f"({SCHEMA_VERSION}); refusing to operate on it"
                 )
+            for target in sorted(MIGRATIONS):
+                if target > version:
+                    MIGRATIONS[target](connection)
+            if version < SCHEMA_VERSION:
+                connection.execute(
+                    "UPDATE schema_meta SET value = ? WHERE key = 'schema_version'",
+                    (str(SCHEMA_VERSION),),
+                )
+                connection.execute(
+                    "INSERT OR REPLACE INTO schema_meta (key, value) VALUES "
+                    "('upgraded_at', ?)",
+                    (now_utc(),),
+                )
+                version = SCHEMA_VERSION
     try:
         database_path().parent.chmod(0o700)
     except OSError:  # pragma: no cover - best effort
@@ -743,6 +905,7 @@ def finish_run(connection: sqlite3.Connection, run_id: int, **fields) -> None:
         "curation_method",
         "email_status",
         "error_summary",
+        "parking_stats",
     }
     updates = {k: v for k, v in fields.items() if k in allowed}
     updates["completed_at"] = now_utc()
@@ -866,4 +1029,9 @@ def statistics(connection: sqlite3.Connection) -> dict:
         "dates_covered": scalar(
             "SELECT COUNT(DISTINCT target_date) FROM daily_records"
         ),
+        "parking_locations": scalar("SELECT COUNT(*) FROM parking_locations"),
+        "parking_aliases": scalar("SELECT COUNT(*) FROM parking_aliases"),
+        "parking_sources": scalar("SELECT COUNT(*) FROM parking_sources"),
+        "parking_unresolved": scalar("SELECT COUNT(*) FROM parking_unresolved"),
+        "parking_landmarks": scalar("SELECT COUNT(*) FROM parking_landmarks"),
     }

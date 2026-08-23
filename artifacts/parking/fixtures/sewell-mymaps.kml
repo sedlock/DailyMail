@@ -1,0 +1,90 @@
+<?xml version='1.0' encoding='utf-8'?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Rowan-Virtua SOM (Sewell) | Rowan University</name>
+    <description>Rowan-Virtua SOM in Sewell, NJ</description>
+    <Folder>
+      <name>Sewell Campus</name>
+      <Placemark>
+        <name>Sewell, Rowan-Virtua SOM</name>
+        <description>description: The Rowan-Virtua SOM Sewell Campus received the highest level of accreditation from the Commission on Osteopathic College Accreditation (COCA) in 2021, and welcomed the inaugural Sewell Campus class in July 2022.&lt;br&gt;location: 39.78137765554885, -75.12783499999999&lt;br&gt;address: 1474 Tanyard Rd, Sewell, NJ, 08080</description>
+        <ExtendedData>
+          <Data name="description">
+            <value>The Rowan-Virtua SOM Sewell Campus received the highest level of accreditation from the Commission on Osteopathic College Accreditation (COCA) in 2021, and welcomed the inaugural Sewell Campus class in July 2022.</value>
+          </Data>
+          <Data name="location">
+            <value>39.78137765554885, -75.12783499999999</value>
+          </Data>
+          <Data name="address">
+            <value>1474 Tanyard Rd, Sewell, NJ, 08080</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.1279684,39.7811646,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Buildings</name>
+      <Placemark>
+        <name>Scott Hall - Rowan College of South Jersey</name>
+        <description>description: &lt;br&gt;location: 39.78214187650918, -75.12290373500578&lt;br&gt;address: 1400 Tanyard Rd, Sewell, NJ 08080</description>
+        <ExtendedData>
+          <Data name="description">
+            <value />
+          </Data>
+          <Data name="location">
+            <value>39.78214187650918, -75.12290373500578</value>
+          </Data>
+          <Data name="address">
+            <value>1400 Tanyard Rd, Sewell, NJ 08080</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.1229037350058,39.7821418765092,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Parking</name>
+      <Placemark>
+        <name>Parking Lot</name>
+        <description>location: 39.78015738184323, -75.12410136528172&lt;br&gt;description: </description>
+        <ExtendedData>
+          <Data name="location">
+            <value>39.78015738184323, -75.12410136528172</value>
+          </Data>
+          <Data name="description">
+            <value />
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.1241013652817,39.7801573818432,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Parking Lot</name>
+        <description>location: &lt;br&gt;description: </description>
+        <ExtendedData>
+          <Data name="location">
+            <value />
+          </Data>
+          <Data name="description">
+            <value />
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.127627,39.7808563,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>

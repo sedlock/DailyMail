@@ -35,8 +35,8 @@ def test_initialize_creates_schema_and_version(settings_obj):
 
 def test_initialize_is_idempotent(settings_obj):
     connection = db.connect()
-    assert db.initialize(connection) == 1
-    assert db.initialize(connection) == 1
+    assert db.initialize(connection) == db.SCHEMA_VERSION
+    assert db.initialize(connection) == db.SCHEMA_VERSION
     rows = connection.execute(
         "SELECT COUNT(*) FROM schema_meta WHERE key='schema_version'"
     ).fetchone()[0]

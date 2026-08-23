@@ -41,6 +41,8 @@ class RenderedDigest:
     submission_ids: list[str] = field(default_factory=list)
     link_normalizations: int = 0
     links_dropped: int = 0
+    parking_callouts: int = 0
+    parking_unresolved: int = 0
 
 
 def _environment() -> Environment:
@@ -98,7 +100,13 @@ def clean_subject(raw: str | None) -> str:
     return " ".join((raw or "").split())
 
 
-def build_items(rows, ordering: dict[str, dict], settings: Settings, processor: ImageProcessor):
+def build_items(
+    rows,
+    ordering: dict[str, dict],
+    settings: Settings,
+    processor: ImageProcessor,
+    parking: dict[str, list] | None = None,
+):
     """Turn database rows into render-ready items, sanitizing bodies as we go."""
     items: dict[str, dict] = {}
     total_normalized = 0
@@ -179,6 +187,10 @@ def build_items(rows, ordering: dict[str, dict], settings: Settings, processor: 
             "event": event,
             "content_hash": row["content_hash"],
             "model_rank": ordering.get(submission_id, {}).get("model_rank", 9999),
+            # Additive enrichment. Empty for almost every announcement, and never
+            # part of `content_hash`: it is reference data about the announcement,
+            # not the announcement's own published content.
+            "parking": list((parking or {}).get(submission_id) or []),
         }
 
     return items, total_normalized, total_dropped
@@ -237,9 +249,12 @@ def render_digest(
     curation_method: str,
     settings: Settings,
     http_client=None,
+    parking: dict[str, list] | None = None,
 ) -> RenderedDigest:
     processor = ImageProcessor(settings, http_client=http_client)
-    items, normalized, dropped = build_items(rows, ordering, settings, processor)
+    items, normalized, dropped = build_items(
+        rows, ordering, settings, processor, parking=parking
+    )
 
     new_groups = group_new(items)
     standing_items = order_standing(items)
@@ -304,4 +319,10 @@ def render_digest(
         submission_ids=ordered_ids,
         link_normalizations=normalized,
         links_dropped=dropped,
+        parking_callouts=sum(
+            1 for spots in (parking or {}).values() for spot in spots if spot.resolved
+        ),
+        parking_unresolved=sum(
+            1 for spots in (parking or {}).values() for spot in spots if not spot.resolved
+        ),
     )

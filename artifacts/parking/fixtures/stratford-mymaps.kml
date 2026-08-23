@@ -1,0 +1,177 @@
+<?xml version='1.0' encoding='utf-8'?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Rowan-Virtua SOM (Stratford) | Rowan University</name>
+    <description>Rowan-Virtua SOM in Stratford, NJ</description>
+    <Folder>
+      <name>Stratford Campus</name>
+      <Placemark>
+        <name>Stratford, Rowan-Virtua SOM</name>
+        <description>Four buildings in the town of Stratford, about 30 minutes from Glassboro, house the educational programs and research facilities for the Rowan-Virtua School of Osteopathic Medicine.&lt;br&gt;&lt;br&gt;Location: 39.830101, -75.006187</description>
+        <ExtendedData>
+          <Data name="Location">
+            <value>39.830101, -75.006187</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.006187,39.830101,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Buildings</name>
+      <Placemark>
+        <name>113 Laurel Road</name>
+        <Point>
+          <coordinates>
+            -75.0086499,39.829687,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Univeristy Educational Center</name>
+        <Point>
+          <coordinates>
+            -75.007518,39.8294727,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Academic Center</name>
+        <Point>
+          <coordinates>
+            -75.0064812,39.8296061,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Science Center</name>
+        <Point>
+          <coordinates>
+            -75.0055346,39.8300135,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Rowan Medicine</name>
+        <Point>
+          <coordinates>
+            -75.0068129,39.8310487,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Parking</name>
+      <Placemark>
+        <name>Staff Parking</name>
+        <Point>
+          <coordinates>
+            -75.0085822,39.8298487,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Staff Parking</name>
+        <Point>
+          <coordinates>
+            -75.0078216,39.8296777,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Staff Parking
+</name>
+        <Point>
+          <coordinates>
+            -75.007312,39.8304522,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Patient Parking</name>
+        <Point>
+          <coordinates>
+            -75.0068015,39.8302355,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Patient Parking
+</name>
+        <Point>
+          <coordinates>
+            -75.0070429,39.8298194,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Patient Parking</name>
+        <Point>
+          <coordinates>
+            -75.0061068,39.8305362,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Patient Parking</name>
+        <Point>
+          <coordinates>
+            -75.0060987,39.8311892,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Student &amp; Staff Parking
+</name>
+        <Point>
+          <coordinates>
+            -75.0052751,39.8291892,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Student &amp; Staff Parking</name>
+        <Point>
+          <coordinates>
+            -75.0046769,39.8293334,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Student &amp; Staff Parking</name>
+        <Point>
+          <coordinates>
+            -75.0046233,39.8296918,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Student &amp; Staff Parking</name>
+        <Point>
+          <coordinates>
+            -75.0045589,39.8300543,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Student &amp; Staff Parking</name>
+        <Point>
+          <coordinates>
+            -75.0046608,39.8304292,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Permitted Staff Parking</name>
+        <Point>
+          <coordinates>
+            -75.0056962,39.8307835,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>

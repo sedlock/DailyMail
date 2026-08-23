@@ -28,7 +28,16 @@ from zoneinfo import ZoneInfo
 
 from . import collect as collector
 from . import config as collector_config
-from . import credentials, curate, db, ingest, mailer, maintenance, render
+from . import (
+    credentials,
+    curate,
+    db,
+    ingest,
+    mailer,
+    maintenance,
+    parking_enrich,
+    render,
+)
 from .errors import (
     DailyMailError,
     TlsError,
@@ -69,6 +78,7 @@ class RunResult:
     error: str | None = None
     maintenance: dict = field(default_factory=dict)
     delivery_id: int | None = None
+    parking: dict = field(default_factory=dict)
 
 
 class RunLock:
@@ -206,6 +216,26 @@ def run_daily(
 
             rows = db.digest_rows(connection, date_value)
 
+            # 6. Parking enrichment. Additive, non-critical, and cheap: a cached
+            # lot is a dictionary lookup. Runs after persistence and before
+            # rendering, and cannot fail the run -- `enrich_digest` never raises.
+            parking_callouts, parking_metrics = parking_enrich.enrich_digest(
+                connection, rows, target_date=date_value, settings=settings
+            )
+            result.parking = parking_metrics.as_dict()
+            if parking_metrics.mentions_detected:
+                log.info(
+                    "parking: %d mention(s), %d cache hit(s), %d miss(es), "
+                    "%d resolver call(s), %d unresolved, %.3fs",
+                    parking_metrics.mentions_detected, parking_metrics.cache_hits,
+                    parking_metrics.cache_misses, parking_metrics.resolver_calls,
+                    parking_metrics.unresolved, parking_metrics.duration_seconds,
+                )
+            for problem in parking_metrics.errors:
+                # Recorded, never escalated: one unresolvable lot is not an
+                # operator alert.
+                log.warning("parking enrichment problem: %s", problem)
+
             # 7. Curate (Claude, or deterministic fallback).
             outcome = curate.curate(rows, date_value, settings)
             result.curation_method = outcome.method
@@ -247,6 +277,7 @@ def run_daily(
                     ordering=ordering,
                     curation_method=outcome.method,
                     settings=settings,
+                    parking=parking_callouts,
                 )
                 _verify_digest(digest, rows)
             except Exception as exc:
@@ -261,6 +292,7 @@ def run_daily(
                     standing_count=counts["standing"], changed_count=counts["changed"],
                     employee_count=counts["employee_view"],
                     student_count=counts["student_view"],
+                    parking_stats=json.dumps(result.parking),
                 )
                 log.error("render failed; nothing sent: %s", exc)
                 _try_alert(settings, date_value, "RenderFailure", str(exc), result)
@@ -330,6 +362,7 @@ def run_daily(
                         changed_count=counts["changed"],
                         employee_count=counts["employee_view"],
                         student_count=counts["student_view"],
+                        parking_stats=json.dumps(result.parking),
                     )
                     result.status = "failed"
                     # Deliberately no alert email: the mail channel just failed.
@@ -375,6 +408,7 @@ def run_daily(
                 employee_count=counts["employee_view"],
                 student_count=counts["student_view"],
                 error_summary=outcome.error[:500] if outcome.error else None,
+                parking_stats=json.dumps(result.parking),
             )
             return result
         finally:

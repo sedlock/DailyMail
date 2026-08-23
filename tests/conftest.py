@@ -352,3 +352,177 @@ def two_audience_mock(employee_fixture, student_fixture) -> MockAnnouncer:
             ],
         }
     )
+
+
+# --- parking -----------------------------------------------------------------
+
+PARKING_FIXTURE_DIR = REPO_ROOT / "artifacts" / "parking" / "fixtures"
+
+# Snapshot filename per source id. The PDF and HTML sources are fingerprinted
+# rather than parsed, so a stub is enough for them.
+PARKING_FIXTURE_FILES = {
+    "glassboro-mymaps": "glassboro-mymaps.kml",
+    "glassboro-parking-map-pdf": "glassboro-parking-map-pdf.stub",
+    "glassboro-parking-regulations": "glassboro-parking-regulations.stub",
+    "stratford-mymaps": "stratford-mymaps.kml",
+    "stratford-som-campus-map": "stratford-som-campus-map.stub",
+    "camden-mymaps": "camden-mymaps.kml",
+    "camden-cmsru-campus-map": "camden-cmsru-campus-map.stub",
+    "camden-cmsru-visitors": "camden-cmsru-visitors.stub",
+    "sewell-mymaps": "sewell-mymaps.kml",
+}
+
+
+class OfflineParkingFetcher:
+    """Serves snapshotted authoritative sources instead of the network.
+
+    `mutate` lets a test change one source's bytes so fingerprint behaviour --
+    "unchanged means do nothing" -- is observable. `fail` makes a source raise,
+    which is how the outage path is tested.
+    """
+
+    def __init__(self, *, mutate: dict[str, bytes] | None = None,
+                 fail: set[str] | None = None) -> None:
+        self.mutate = dict(mutate or {})
+        self.fail = set(fail or ())
+        self.calls: list[str] = []
+
+    def __call__(self, source):
+        from dailymail import parking_sources
+
+        self.calls.append(source.source_id)
+        if source.source_id in self.fail:
+            raise parking_sources.SourceFetchError(
+                f"{source.source_id}: simulated outage"
+            )
+        if source.source_id in self.mutate:
+            content = self.mutate[source.source_id]
+        else:
+            name = PARKING_FIXTURE_FILES.get(source.source_id)
+            if name is None:
+                raise parking_sources.SourceFetchError(
+                    f"{source.source_id}: no fixture"
+                )
+            content = (PARKING_FIXTURE_DIR / name).read_bytes()
+        return parking_sources.FetchedSource(
+            source=source,
+            content=content,
+            fingerprint=parking_sources.fingerprint_bytes(content),
+        )
+
+
+@pytest.fixture(autouse=True)
+def no_parking_network_or_subprocess(request, monkeypatch):
+    """Make "a cached day costs nothing" a tested invariant, not a hope.
+
+    Every parking path that would reach the network or launch `claude` is wired
+    to fail loudly here. A test that wants one of those paths injects its own
+    `fetcher=` / `resolver_runner=` / `description_runner=`, which bypasses these
+    entirely -- so a test that *accidentally* triggers a fetch or a model call
+    fails instead of quietly making a real request.
+    """
+    if request.node.fspath.basename == "test_parking_live.py":
+        return  # the opt-in live probes exist precisely to make real requests
+
+    from dailymail import parking_agent, parking_sources
+
+    def blocked_fetch(source, *args, **kwargs):
+        raise parking_sources.SourceFetchError(
+            f"{source.source_id}: network is disabled in the test suite; inject a "
+            f"fetcher instead"
+        )
+
+    def blocked_agent(*args, **kwargs):
+        raise AssertionError(
+            "a parking agent subprocess was launched from a test; inject a runner"
+        )
+
+    monkeypatch.setattr(parking_sources, "fetch", blocked_fetch)
+    monkeypatch.setattr(parking_agent, "_invoke_resolver", blocked_agent)
+    monkeypatch.setattr(parking_agent, "_invoke_description_writer", blocked_agent)
+
+
+@pytest.fixture
+def parking_fetcher() -> "OfflineParkingFetcher":
+    return OfflineParkingFetcher()
+
+
+def stub_description_runner(sentences: dict[str, str] | None = None, *, calls=None):
+    """A description writer that never launches a subprocess.
+
+    Returns a plausible sentence built from the evidence the caller supplied, so
+    the grounding validator is genuinely exercised.
+    """
+    sentences = sentences or {}
+
+    def runner(payload, settings):
+        if calls is not None:
+            calls.append(payload)
+        out = []
+        for facility in payload["facilities"]:
+            canonical_id = facility["canonical_id"]
+            if canonical_id in sentences:
+                text = sentences[canonical_id]
+            elif facility["nearby"]:
+                nearest = facility["nearby"][0]
+                permit = facility["permit_class"]
+                lead = "Parking" if permit == "Unknown" else permit
+                kind = "garage" if facility["facility_type"] == "garage" else "lot"
+                text = (
+                    f"{lead} {kind} immediately "
+                    f"{_opposite(nearest['direction_from_lot'])} of "
+                    f"{nearest['name']} on the "
+                    f"{facility['campus']} campus."
+                )
+                if len(facility["nearby"]) > 1:
+                    second = facility["nearby"][1]
+                    text = (
+                        f"{lead} {kind} "
+                        f"{_opposite(nearest['direction_from_lot'])} of "
+                        f"{nearest['name']}, "
+                        f"{_opposite(second['direction_from_lot'])} of "
+                        f"{second['name']}."
+                    )
+            else:
+                text = ""
+            out.append(
+                {
+                    "canonical_id": canonical_id,
+                    "canonical_name": facility["facility_name"],
+                    "description": text,
+                    "confidence": "high" if text else "low",
+                    "landmarks_used": [n["name"] for n in facility["nearby"][:2]],
+                }
+            )
+        return {"descriptions": out}, 0.0, "stub-model"
+
+    return runner
+
+
+_OPPOSITES = {
+    "north": "south", "south": "north", "east": "west", "west": "east",
+    "northeast": "southwest", "southwest": "northeast",
+    "northwest": "southeast", "southeast": "northwest",
+}
+
+
+def _opposite(direction: str) -> str:
+    parts = direction.split("-")
+    return "-".join(_OPPOSITES.get(part, part) for part in parts)
+
+
+@pytest.fixture
+def parking_cache(settings_obj, parking_fetcher):
+    """A database with the parking catalog bootstrapped from the snapshots."""
+    from dailymail import db, parking_refresh
+
+    connection = db.connect()
+    db.initialize(connection)
+    parking_refresh.refresh(
+        connection,
+        settings_obj,
+        fetcher=parking_fetcher,
+        description_runner=stub_description_runner(),
+    )
+    yield connection
+    connection.close()

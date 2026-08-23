@@ -43,6 +43,9 @@
     </table>
     {%- endif %}
 
+    {#- parking enrichment: additive, between metadata and the original body -#}
+{% include 'parking.html.j2' %}
+
     {#- complete announcement body, sanitized -#}
     <div class="body-copy" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:15px;line-height:1.52;color:#1a1a1a;padding:6px 0 2px 0;">
       {{ item.body_html }}
