@@ -32,6 +32,25 @@ uv run dailymail db-status         # database and category state
 uv run dailymail parking-status    # the parking reference cache
 ```
 
+## Deployment and ControlPanel remediation
+
+From the authoritative DailyMail checkout, use the narrow deployment contract:
+
+```sh
+cd /mnt/bench/src/DailyMail
+./scripts/install.sh            # locked dependency sync + unit write/reload only
+./scripts/install.sh --status   # health JSON + exact user-unit status, read-only
+./scripts/install.sh --remove   # remove user units only; retain all data
+```
+
+`install.sh` has a fixed-path guard and runs only from
+`/mnt/bench/src/DailyMail`; it accepts no repository, database, unit, or command
+override. It preserves the SQLite history, collection artifacts, diagnostics,
+configuration, and credentials. It does not invoke Rowan retrieval, Claude
+curation, SMTP, or `dailymail.service`.
+See `docs/operations.md` for the backup, rollback, and deliberate live
+verification contract.
+
 Preview without sending:
 
 ```sh

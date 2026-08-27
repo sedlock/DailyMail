@@ -48,7 +48,7 @@ is two HTTP requests and under two seconds.
 ## 2. Commands
 
 ```sh
-cd ~/src/DailyMail
+cd /mnt/bench/src/DailyMail
 
 # production
 uv run dailymail run-daily                       # today, Eastern
@@ -98,6 +98,78 @@ systemctl --user start dailymail.service         # run now, through systemd
 systemctl --user disable --now dailymail.timer   # stop scheduling
 systemctl --user enable --now dailymail.timer    # resume scheduling
 ```
+
+### Deployment, remediation and rollback contract
+
+For a DailyMail code deployment or a ControlPanel-approved remediation, run the
+checked-in installer from the canonical checkout:
+
+```sh
+cd /mnt/bench/src/DailyMail
+./scripts/install.sh
+```
+
+The installer has one fixed repository path:
+`/mnt/bench/src/DailyMail`. Its guard rejects worktrees, copied scripts and
+other paths. It performs `uv sync --frozen` and delegates exact unit generation
+and daemon reload to `dailymail install-timer --no-enable`. It intentionally does
+not start or newly enable the persistent timer: a missed persistent timer can
+run immediately and contact Rowan or send email. Existing enabled timers remain
+enabled after the unit reload. A newly installed timer can be explicitly enabled
+only after the operator accepts that normal schedule semantics apply:
+
+```sh
+systemctl --user enable --now dailymail.timer
+```
+
+The inspection command is read-only at the application level and does not sync
+the environment:
+
+```sh
+./scripts/install.sh --status
+```
+
+It runs exactly `dailymail health --json` through the installed environment,
+then `systemctl --user status dailymail.service dailymail.timer --no-pager
+--full`. It never creates a database/configuration, retrieves Rowan data, or
+sends email. Run `./scripts/install.sh` first if the local virtual environment
+does not exist.
+
+Removal only removes DailyMail user-unit files and disables its timer:
+
+```sh
+./scripts/install.sh --remove
+```
+
+It deliberately preserves all application state and credentials. In particular,
+it does not delete `~/.local/share/dailymail/`, `~/.local/state/dailymail/`,
+`~/.config/dailymail/config.toml`, or `~/.config/dailymail/credentials.env`.
+
+Before a code rollout, take a SQLite-consistent state backup (including no
+credentials) with a destination outside the DailyMail state directory:
+
+```sh
+sqlite3 ~/.local/share/dailymail/dailymail.sqlite3 \
+  ".backup '/safe/backups/dailymail-before-deploy.sqlite3'"
+```
+
+Do not copy only the live `.sqlite3` file while WAL is active. A code rollback
+uses the approved ControlPanel lifecycle: ControlPanel creates a dedicated
+revert branch from `main`, opens a reviewed revert PR, waits for required CI and
+review, and merges that PR into `main`. It is a code rollback, not a database
+rollback. Only after merged `main` is current locally, run the same
+no-business-job installer:
+
+```sh
+git -C /mnt/bench/src/DailyMail switch main
+git -C /mnt/bench/src/DailyMail pull --ff-only origin main
+cd /mnt/bench/src/DailyMail && ./scripts/install.sh
+```
+
+Normal live verification is deliberately separate from installation. Starting
+`dailymail.service`, invoking `run-daily`, or enabling/starting a missed timer
+can contact Rowan and may send the configured digest. Do not use those commands
+to test a deployment unless those business side effects are intended.
 
 ### ControlPanel health contract
 
