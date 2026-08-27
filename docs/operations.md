@@ -58,6 +58,8 @@ uv run dailymail run-daily --force-resend        # deliberate duplicate send
 
 # inspection
 uv run dailymail status                          # runs, deliveries, timer
+uv run dailymail health --json                   # read-only controlpanel.status.v1 JSON
+uv run dailymail status --json                   # compatibility alias for the same JSON
 uv run dailymail db-status                       # schema, counts, categories, backups
 uv run dailymail render --date 2026-08-20 --inline-images --out /tmp/preview
 uv run dailymail inspect --date 2026-08-20       # the collection artifact
@@ -96,6 +98,26 @@ systemctl --user start dailymail.service         # run now, through systemd
 systemctl --user disable --now dailymail.timer   # stop scheduling
 systemctl --user enable --now dailymail.timer    # resume scheduling
 ```
+
+### ControlPanel health contract
+
+`uv run dailymail health --json` is the stable machine-readable integration
+surface. It emits `schema_version: "controlpanel.status.v1"`, `project`, an
+UTC observation timestamp, overall health, separate retrieval and digest
+components, schedule state, bounded recent runs, parking-cache summaries and
+problems. Components use the shared `id`, `name`, `health` and `summary`
+fields, while metrics are deliberately flat scalar values and recent runs use
+the shared start/finish/success/summary shape. It reads the existing SQLite database in read-only mode and asks
+systemd only for unit state; it never creates configuration, a database, a
+credential file, a run, or any network traffic. Errors and stored run summaries
+are bounded and redact email addresses, Bearer/Authorization tokens,
+password/token/secret assignments and URI userinfo. Systemd and loginctl status
+queries have short per-command timeouts and one total status deadline.
+
+The response intentionally contains no recipient, SMTP status detail, message
+IDs, announcement bodies, or credentials. A missing/unreadable database is an
+explicit `overall.health: "unknown"` observation rather than a bootstrap or a
+false healthy response.
 
 ### Exit codes
 

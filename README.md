@@ -27,6 +27,7 @@ uv run pytest                      # 632 tests, no network required
 
 uv run dailymail run-daily         # the full pipeline for today
 uv run dailymail status            # runs, deliveries, timer state
+uv run dailymail health --json     # read-only controlpanel.status.v1 document
 uv run dailymail db-status         # database and category state
 uv run dailymail parking-status    # the parking reference cache
 ```

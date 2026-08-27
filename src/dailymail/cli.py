@@ -107,6 +107,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
     status_parser = subparsers.add_parser("status", help="Recent runs and deliveries.")
     status_parser.add_argument("--limit", type=int, default=10)
+    status_parser.add_argument(
+        "--json", action="store_true",
+        help="Emit the versioned, read-only ControlPanel status document.",
+    )
+
+    health_parser = subparsers.add_parser(
+        "health", help="Read-only machine-readable health for ControlPanel."
+    )
+    health_parser.add_argument(
+        "--json", action="store_true", required=True,
+        help="Emit controlpanel.status.v1 JSON.",
+    )
 
     subparsers.add_parser("db-status", help="Database statistics.")
 
@@ -552,6 +564,9 @@ def _cmd_send(args: argparse.Namespace) -> int:
 
 
 def _cmd_status(args: argparse.Namespace) -> int:
+    if args.json:
+        return _cmd_health(args)
+
     from . import db, settings as settings_module, systemd_units
 
     settings = settings_module.load()
@@ -622,6 +637,14 @@ def _cmd_status(args: argparse.Namespace) -> int:
     if timer["list_timers"]:
         print(f"  {timer['list_timers']}")
     print(f"\nlogs: journalctl --user -u {timer['service']} -n 100 --no-pager")
+    return 0
+
+
+def _cmd_health(args: argparse.Namespace) -> int:
+    """Print the stable status contract without changing DailyMail state."""
+    from . import health
+
+    print(json.dumps(health.build_status(), sort_keys=True, separators=(",", ":")))
     return 0
 
 
@@ -1104,6 +1127,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_send(args)
         if args.command == "status":
             return _cmd_status(args)
+        if args.command == "health":
+            return _cmd_health(args)
         if args.command == "db-status":
             return _cmd_db_status(args)
         if args.command == "db-init":
