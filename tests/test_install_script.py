@@ -9,6 +9,7 @@ from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 INSTALLER = REPOSITORY / "scripts" / "install.sh"
+CANONICAL_REPOSITORY = "/mnt/bench/src/DailyMail"
 
 
 def _executable(path: Path, text: str) -> None:
@@ -47,17 +48,52 @@ def _environment(tmp_path: Path) -> tuple[dict[str, str], Path]:
     return environment, call_log
 
 
+def _canonical_installer(tmp_path: Path) -> tuple[Path, Path]:
+    """Build a disposable canonical-path fixture without changing the source script."""
+    repository = tmp_path / "canonical-dailymail"
+    script_dir = repository / "scripts"
+    script_dir.mkdir(parents=True)
+    (repository / "pyproject.toml").write_text("[project]\nname='test'\n")
+    (repository / "uv.lock").write_text("version = 1\n")
+    installer = script_dir / "install.sh"
+    installer.write_text(
+        INSTALLER.read_text(encoding="utf-8").replace(
+            CANONICAL_REPOSITORY, str(repository)
+        ),
+        encoding="utf-8",
+    )
+    installer.chmod(installer.stat().st_mode | stat.S_IXUSR)
+    return repository, installer
+
+
 def _run(tmp_path: Path, *args: str) -> tuple[subprocess.CompletedProcess[str], str]:
     environment, call_log = _environment(tmp_path)
+    repository, installer = _canonical_installer(tmp_path)
     result = subprocess.run(
-        [str(INSTALLER), *args],
-        cwd=REPOSITORY,
+        [str(installer), *args],
+        cwd=repository,
         env=environment,
         text=True,
         capture_output=True,
         check=False,
     )
     return result, call_log.read_text(encoding="utf-8") if call_log.exists() else ""
+
+
+def test_installer_requires_the_exact_authoritative_path(tmp_path):
+    environment, call_log = _environment(tmp_path)
+    result = subprocess.run(
+        [str(INSTALLER), "--status"],
+        cwd=REPOSITORY,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert CANONICAL_REPOSITORY in result.stderr
+    assert not call_log.exists(), "the fixed-path guard must run before inspection"
 
 
 def test_install_uses_frozen_sync_and_never_starts_daily_work(tmp_path):
@@ -87,6 +123,7 @@ def test_status_is_nosync_health_and_exact_unit_status(tmp_path):
 
 def test_remove_only_removes_units_and_preserves_state_and_credentials(tmp_path):
     environment, call_log = _environment(tmp_path)
+    repository, installer = _canonical_installer(tmp_path)
     unit_dir = Path(environment["XDG_CONFIG_HOME"]) / "systemd" / "user"
     unit_dir.mkdir(parents=True)
     service = unit_dir / "dailymail.service"
@@ -101,8 +138,8 @@ def test_remove_only_removes_units_and_preserves_state_and_credentials(tmp_path)
     credential.write_text("test-credential-material\n", encoding="utf-8")
 
     result = subprocess.run(
-        [str(INSTALLER), "--remove"],
-        cwd=REPOSITORY,
+        [str(installer), "--remove"],
+        cwd=repository,
         env=environment,
         text=True,
         capture_output=True,

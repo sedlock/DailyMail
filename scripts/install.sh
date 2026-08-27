@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Install DailyMail's checked-in user units without running DailyMail work.
 #
-# This script has no configurable repository path by design. It always uses the
-# repository containing this file, which is also the path written into the
+# This script has no configurable repository path by design. It runs only from
+# the authoritative DailyMail checkout, which is the path written into the
 # systemd unit by `dailymail install-timer`.
 
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPOSITORY_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)"
+CANONICAL_REPOSITORY_DIR="/mnt/bench/src/DailyMail"
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 SERVICE_UNIT="$UNIT_DIR/dailymail.service"
 TIMER_UNIT="$UNIT_DIR/dailymail.timer"
@@ -26,6 +27,10 @@ EOF
 }
 
 require_repository() {
+    if [[ "$REPOSITORY_DIR" != "$CANONICAL_REPOSITORY_DIR" ]]; then
+        echo "DailyMail installer must run from $CANONICAL_REPOSITORY_DIR." >&2
+        exit 2
+    fi
     if [[ ! -f "$REPOSITORY_DIR/pyproject.toml" || ! -f "$REPOSITORY_DIR/uv.lock" ]]; then
         echo "DailyMail repository files are missing beside this script." >&2
         exit 2

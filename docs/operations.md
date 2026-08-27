@@ -48,7 +48,7 @@ is two HTTP requests and under two seconds.
 ## 2. Commands
 
 ```sh
-cd ~/src/DailyMail
+cd /mnt/bench/src/DailyMail
 
 # production
 uv run dailymail run-daily                       # today, Eastern
@@ -105,13 +105,14 @@ For a DailyMail code deployment or a ControlPanel-approved remediation, run the
 checked-in installer from the canonical checkout:
 
 ```sh
-cd ~/src/DailyMail
+cd /mnt/bench/src/DailyMail
 ./scripts/install.sh
 ```
 
-The installer has one fixed repository path: the repository containing the
-script. It performs `uv sync --frozen` and delegates exact unit generation and
-daemon reload to `dailymail install-timer --no-enable`. It intentionally does
+The installer has one fixed repository path:
+`/mnt/bench/src/DailyMail`. Its guard rejects worktrees, copied scripts and
+other paths. It performs `uv sync --frozen` and delegates exact unit generation
+and daemon reload to `dailymail install-timer --no-enable`. It intentionally does
 not start or newly enable the persistent timer: a missed persistent timer can
 run immediately and contact Rowan or send email. Existing enabled timers remain
 enabled after the unit reload. A newly installed timer can be explicitly enabled
@@ -153,12 +154,16 @@ sqlite3 ~/.local/share/dailymail/dailymail.sqlite3 \
 ```
 
 Do not copy only the live `.sqlite3` file while WAL is active. A code rollback
-is a source-control revert followed by the same no-business-job install step;
-it is not a database rollback:
+uses the approved ControlPanel lifecycle: ControlPanel creates a dedicated
+revert branch from `main`, opens a reviewed revert PR, waits for required CI and
+review, and merges that PR into `main`. It is a code rollback, not a database
+rollback. Only after merged `main` is current locally, run the same
+no-business-job installer:
 
 ```sh
-git -C ~/src/DailyMail revert --no-edit <deployment-commit>
-cd ~/src/DailyMail && ./scripts/install.sh
+git -C /mnt/bench/src/DailyMail switch main
+git -C /mnt/bench/src/DailyMail pull --ff-only origin main
+cd /mnt/bench/src/DailyMail && ./scripts/install.sh
 ```
 
 Normal live verification is deliberately separate from installation. Starting
