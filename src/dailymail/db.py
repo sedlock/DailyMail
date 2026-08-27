@@ -389,6 +389,25 @@ def connect(path: Path | None = None, *, create_dirs: bool = True) -> sqlite3.Co
     return connection
 
 
+def connect_readonly(path: Path | None = None) -> sqlite3.Connection:
+    """Open the existing database without creating or changing anything.
+
+    This is intentionally separate from :func:`connect`: an operator status
+    command must be safe to run while a production job owns the writer lock and
+    must never bootstrap an empty database as a side effect of being observed.
+    """
+    target = path or database_path()
+    if not target.is_file():
+        raise FileNotFoundError(f"database does not exist: {target}")
+    connection = sqlite3.connect(
+        f"file:{target}?mode=ro", uri=True, timeout=BUSY_TIMEOUT_MS / 1000
+    )
+    connection.row_factory = sqlite3.Row
+    connection.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+    connection.execute("PRAGMA query_only = ON")
+    return connection
+
+
 @contextmanager
 def transaction(connection: sqlite3.Connection):
     """Explicit all-or-nothing unit of work."""
