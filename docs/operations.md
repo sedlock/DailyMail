@@ -99,6 +99,73 @@ systemctl --user disable --now dailymail.timer   # stop scheduling
 systemctl --user enable --now dailymail.timer    # resume scheduling
 ```
 
+### Deployment, remediation and rollback contract
+
+For a DailyMail code deployment or a ControlPanel-approved remediation, run the
+checked-in installer from the canonical checkout:
+
+```sh
+cd ~/src/DailyMail
+./scripts/install.sh
+```
+
+The installer has one fixed repository path: the repository containing the
+script. It performs `uv sync --frozen` and delegates exact unit generation and
+daemon reload to `dailymail install-timer --no-enable`. It intentionally does
+not start or newly enable the persistent timer: a missed persistent timer can
+run immediately and contact Rowan or send email. Existing enabled timers remain
+enabled after the unit reload. A newly installed timer can be explicitly enabled
+only after the operator accepts that normal schedule semantics apply:
+
+```sh
+systemctl --user enable --now dailymail.timer
+```
+
+The inspection command is read-only at the application level and does not sync
+the environment:
+
+```sh
+./scripts/install.sh --status
+```
+
+It runs exactly `dailymail health --json` through the installed environment,
+then `systemctl --user status dailymail.service dailymail.timer --no-pager
+--full`. It never creates a database/configuration, retrieves Rowan data, or
+sends email. Run `./scripts/install.sh` first if the local virtual environment
+does not exist.
+
+Removal only removes DailyMail user-unit files and disables its timer:
+
+```sh
+./scripts/install.sh --remove
+```
+
+It deliberately preserves all application state and credentials. In particular,
+it does not delete `~/.local/share/dailymail/`, `~/.local/state/dailymail/`,
+`~/.config/dailymail/config.toml`, or `~/.config/dailymail/credentials.env`.
+
+Before a code rollout, take a SQLite-consistent state backup (including no
+credentials) with a destination outside the DailyMail state directory:
+
+```sh
+sqlite3 ~/.local/share/dailymail/dailymail.sqlite3 \
+  ".backup '/safe/backups/dailymail-before-deploy.sqlite3'"
+```
+
+Do not copy only the live `.sqlite3` file while WAL is active. A code rollback
+is a source-control revert followed by the same no-business-job install step;
+it is not a database rollback:
+
+```sh
+git -C ~/src/DailyMail revert --no-edit <deployment-commit>
+cd ~/src/DailyMail && ./scripts/install.sh
+```
+
+Normal live verification is deliberately separate from installation. Starting
+`dailymail.service`, invoking `run-daily`, or enabling/starting a missed timer
+can contact Rowan and may send the configured digest. Do not use those commands
+to test a deployment unless those business side effects are intended.
+
 ### ControlPanel health contract
 
 `uv run dailymail health --json` is the stable machine-readable integration
