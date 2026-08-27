@@ -53,23 +53,41 @@ def _safe_text(value: object, *, limit: int = 300) -> str | None:
     return text[:limit]
 
 
-def _duration_seconds(started_at: str | None, completed_at: str | None) -> float | None:
-    if not started_at or not completed_at:
+def _parse_persisted_timestamp(value: object) -> datetime | None:
+    """Parse a historical timestamp, treating legacy naive values as UTC.
+
+    DailyMail's production writes are UTC-aware ISO timestamps. Older or
+    manually recovered SQLite rows can be naive, though, so the read-only
+    health contract treats them as UTC rather than allowing a mixed-aware
+    subtraction to fail. Malformed values remain Unknown (`None`).
+    """
+    if not isinstance(value, str) or not value.strip():
         return None
     try:
-        started = datetime.fromisoformat(started_at)
-        completed = datetime.fromisoformat(completed_at)
-    except ValueError:
+        parsed = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _normalized_timestamp(value: object) -> str | None:
+    parsed = _parse_persisted_timestamp(value)
+    return parsed.isoformat() if parsed else None
+
+
+def _duration_seconds(started_at: str | None, completed_at: str | None) -> float | None:
+    started = _parse_persisted_timestamp(started_at)
+    completed = _parse_persisted_timestamp(completed_at)
+    if not started or not completed:
         return None
     return max(0.0, round((completed - started).total_seconds(), 3))
 
 
 def _age_seconds(stamp: str | None) -> float | None:
-    if not stamp:
-        return None
-    try:
-        parsed = datetime.fromisoformat(stamp)
-    except ValueError:
+    parsed = _parse_persisted_timestamp(stamp)
+    if not parsed:
         return None
     return max(0.0, round((datetime.now(UTC) - parsed).total_seconds(), 3))
 
@@ -159,8 +177,8 @@ def _run_summary(row: sqlite3.Row) -> dict[str, Any]:
         if error:
             summary = f"{summary}: {error}"
     return {
-        "started_at": row["started_at"],
-        "finished_at": row["completed_at"],
+        "started_at": _normalized_timestamp(row["started_at"]),
+        "finished_at": _normalized_timestamp(row["completed_at"]),
         "success": success,
         "summary": summary,
         "metrics": _run_metrics(row),
@@ -263,8 +281,12 @@ def _component(
         "freshness_seconds": _freshness_seconds(latest["completed_at"])
         if latest
         else None,
-        "last_attempt": latest["started_at"] if latest else None,
-        "last_success": last_success["completed_at"] if last_success else None,
+        "last_attempt": _normalized_timestamp(latest["started_at"]) if latest else None,
+        "last_success": (
+            _normalized_timestamp(last_success["completed_at"])
+            if last_success
+            else None
+        ),
         "next_expected": _next_expected(timer.get("next_elapse")),
         "actions": ["run", "enable", "disable", "refresh"],
         "evidence": evidence,

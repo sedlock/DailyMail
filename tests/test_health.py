@@ -134,6 +134,35 @@ def test_dry_run_is_paused_not_digest_delivery_success(
     assert "no digest was sent" in payload["recent_runs"][0]["summary"]
 
 
+def test_health_normalizes_naive_and_malformed_persisted_timestamps(
+    populated_db, timer_status, capsys
+):
+    _record_run(populated_db)
+    populated_db.execute(
+        "UPDATE runs SET started_at = ?, completed_at = ?",
+        ("2026-08-20T01:00:00", "2026-08-20T01:01:30+00:00"),
+    )
+    populated_db.commit()
+
+    assert cli.main(["health", "--json"]) == 0
+    mixed = json.loads(capsys.readouterr().out)
+    assert mixed["recent_runs"][0]["metrics"]["duration_seconds"] == 90.0
+    assert mixed["recent_runs"][0]["started_at"] == "2026-08-20T01:00:00+00:00"
+
+    populated_db.execute(
+        "UPDATE runs SET started_at = ?, completed_at = ?",
+        ("not-a-timestamp", "also-not-a-timestamp"),
+    )
+    populated_db.commit()
+
+    assert cli.main(["health", "--json"]) == 0
+    malformed = json.loads(capsys.readouterr().out)
+    assert malformed["recent_runs"][0]["started_at"] is None
+    assert malformed["recent_runs"][0]["finished_at"] is None
+    assert malformed["recent_runs"][0]["metrics"]["duration_seconds"] is None
+    assert malformed["components"][0]["freshness_seconds"] is None
+
+
 def test_health_without_database_is_unknown_and_does_not_create_one(
     timer_status, capsys
 ):
