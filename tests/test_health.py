@@ -46,7 +46,9 @@ def _record_run(connection, *, status="success", email_status="sent", error=None
     )
 
 
-def test_health_json_has_stable_components_and_metrics(populated_db, timer_status, capsys):
+def test_health_json_has_stable_components_and_metrics(
+    populated_db, timer_status, capsys
+):
     _record_run(populated_db)
 
     assert cli.main(["health", "--json"]) == 0
@@ -54,26 +56,33 @@ def test_health_json_has_stable_components_and_metrics(populated_db, timer_statu
 
     assert payload["schema_version"] == "controlpanel.status.v1"
     assert payload["project"] == "dailymail"
-    assert payload["overall"]["health"] == "healthy"
+    assert payload["health"] == "healthy"
+    assert payload["summary"] == "Latest retrieval succeeded"
     assert [component["id"] for component in payload["components"]] == [
-        "daily-retrieval", "daily-digest"
+        "daily-retrieval",
+        "daily-digest",
     ]
-    assert payload["components"][0]["schedule"]["timezone"] == "America/New_York"
-    assert payload["components"][0]["safe_actions"] == [
-        "run_now", "enable", "disable", "refresh", "view_logs"
-    ]
-    assert payload["metrics"]["announcements"] == {
-        "unique": 13,
-        "new": 5,
-        "standing": 8,
-        "changed": 1,
-        "employee_view": 13,
-        "student_view": 3,
-    }
-    assert payload["metrics"]["parking_cache"]["latest_run"] == {
-        "cache_hits": 2, "cache_misses": 1
-    }
-    assert payload["recent_runs"][0]["duration_seconds"] is not None
+    for component in payload["components"]:
+        assert {"id", "name", "health", "summary"} <= component.keys()
+        assert component["health"] == "healthy"
+        assert component["actions"] == ["run", "enable", "disable", "refresh"]
+        assert isinstance(component["evidence"], list)
+        assert isinstance(component["freshness_seconds"], int)
+    assert payload["metrics"]["latest_success_announcements_unique"] == 13
+    assert payload["metrics"]["latest_success_announcements_new"] == 5
+    assert payload["metrics"]["latest_run_parking_cache_hits"] == 2
+    assert all(
+        value is None or isinstance(value, (int, float, str))
+        for value in payload["metrics"].values()
+    )
+    run = payload["recent_runs"][0]
+    assert set(run) == {"started_at", "finished_at", "success", "summary", "metrics"}
+    assert run["success"] is True
+    assert run["metrics"]["duration_seconds"] is not None
+    assert all(
+        value is None or isinstance(value, (int, float, str))
+        for value in run["metrics"].values()
+    )
 
 
 def test_status_json_alias_and_error_redaction(populated_db, timer_status, capsys):
@@ -95,7 +104,39 @@ def test_status_json_alias_and_error_redaction(populated_db, timer_status, capsy
     assert "[redacted-email]" in rendered
 
 
-def test_health_without_database_is_unknown_and_does_not_create_one(timer_status, capsys):
+def test_health_redacts_bearer_tokens_and_uri_userinfo():
+    text = health._safe_text(
+        "Authorization: Bearer abc.def-123 token=other "
+        "postgres://operator:password@db.example.test/app"
+    )
+    assert text is not None
+    assert "abc.def-123" not in text
+    assert "other" not in text
+    assert "operator:password" not in text
+    assert "Bearer [redacted]" in text
+    assert "postgres://[redacted]@" in text
+
+
+def test_dry_run_is_paused_not_digest_delivery_success(
+    populated_db, timer_status, capsys
+):
+    _record_run(populated_db, status="success", email_status="dry_run")
+
+    assert cli.main(["health", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    digest = next(
+        item for item in payload["components"] if item["id"] == "daily-digest"
+    )
+    assert digest["health"] == "paused"
+    assert digest["last_success"] is None
+    assert payload["recent_runs"][0]["success"] is None
+    assert "no digest was sent" in payload["recent_runs"][0]["summary"]
+
+
+def test_health_without_database_is_unknown_and_does_not_create_one(
+    timer_status, capsys
+):
     path = db.database_path()
     assert not path.exists()
 

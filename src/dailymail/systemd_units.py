@@ -12,11 +12,15 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 SERVICE_NAME = "dailymail.service"
 TIMER_NAME = "dailymail.timer"
+COMMAND_TIMEOUT_SECONDS = 10.0
+STATUS_COMMAND_TIMEOUT_SECONDS = 2.0
+STATUS_DEADLINE_SECONDS = 6.0
 
 SERVICE_TEMPLATE = """\
 [Unit]
@@ -168,13 +172,38 @@ def write_units(plan: UnitPlan) -> None:
     plan.timer_path.write_text(plan.timer_text, encoding="utf-8")
 
 
-def _systemctl(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["systemctl", "--user", *args],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+def _run_bounded(argv: list[str], *, timeout: float) -> subprocess.CompletedProcess:
+    """Run one fixed local command with a bounded, non-throwing result."""
+    try:
+        return subprocess.run(
+            argv,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=max(0.1, timeout),
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = (
+            exc.stdout.decode() if isinstance(exc.stdout, bytes) else exc.stdout or ""
+        )
+        stderr = (
+            exc.stderr.decode() if isinstance(exc.stderr, bytes) else exc.stderr or ""
+        )
+        return subprocess.CompletedProcess(
+            argv, 124, stdout, (stderr + " command timed out").strip()
+        )
+
+
+def _systemctl(
+    *args: str, timeout: float = COMMAND_TIMEOUT_SECONDS
+) -> subprocess.CompletedProcess:
+    return _run_bounded(["systemctl", "--user", *args], timeout=timeout)
+
+
+def _loginctl(
+    *args: str, timeout: float = COMMAND_TIMEOUT_SECONDS
+) -> subprocess.CompletedProcess:
+    return _run_bounded(["loginctl", *args], timeout=timeout)
 
 
 def install(plan: UnitPlan, *, enable: bool = True) -> dict:
@@ -197,13 +226,12 @@ def install(plan: UnitPlan, *, enable: bool = True) -> dict:
     return results
 
 
-def linger_enabled(user: str | None = None) -> bool:
+def linger_enabled(
+    user: str | None = None, *, timeout: float = COMMAND_TIMEOUT_SECONDS
+) -> bool:
     """Whether the user manager runs while logged out (reboot durability)."""
     name = user or os.environ.get("USER") or ""
-    result = subprocess.run(
-        ["loginctl", "show-user", name, "-p", "Linger"],
-        capture_output=True, text=True, check=False,
-    )
+    result = _loginctl("show-user", name, "-p", "Linger", timeout=timeout)
     return "Linger=yes" in result.stdout
 
 
@@ -212,29 +240,42 @@ def enable_linger(user: str | None = None) -> tuple[bool, str]:
     name = user or os.environ.get("USER") or ""
     if linger_enabled(name):
         return True, "already enabled"
-    result = subprocess.run(
-        ["loginctl", "enable-linger", name],
-        capture_output=True, text=True, check=False,
-    )
+    result = _loginctl("enable-linger", name)
     if result.returncode == 0 and linger_enabled(name):
         return True, "enabled"
     return False, (result.stderr or result.stdout or "unknown failure").strip()[:300]
 
 
 def status() -> dict:
-    """Operational view of the installed units."""
-    timer_enabled = _systemctl("is-enabled", TIMER_NAME).stdout.strip()
-    timer_active = _systemctl("is-active", TIMER_NAME).stdout.strip()
-    service_load = _systemctl("show", SERVICE_NAME, "-p", "LoadState", "--value")
-    listing = _systemctl(
+    """Operational view of the installed units within one short deadline."""
+    deadline = time.monotonic() + STATUS_DEADLINE_SECONDS
+
+    def run_status(*args: str) -> subprocess.CompletedProcess:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return subprocess.CompletedProcess(
+                ["systemctl", "--user", *args], 124, "", "status deadline exceeded"
+            )
+        return _systemctl(*args, timeout=min(STATUS_COMMAND_TIMEOUT_SECONDS, remaining))
+
+    timer_enabled = run_status("is-enabled", TIMER_NAME).stdout.strip()
+    timer_active = run_status("is-active", TIMER_NAME).stdout.strip()
+    service_load = run_status("show", SERVICE_NAME, "-p", "LoadState", "--value")
+    listing = run_status(
         "list-timers", TIMER_NAME, "--all", "--no-pager", "--no-legend"
     ).stdout.strip()
-    next_run = _systemctl(
+    next_run = run_status(
         "show", TIMER_NAME, "-p", "NextElapseUSecRealtime", "--value"
     ).stdout.strip()
-    last_result = _systemctl(
+    last_result = run_status(
         "show", SERVICE_NAME, "-p", "Result", "--value"
     ).stdout.strip()
+    remaining = deadline - time.monotonic()
+    linger = (
+        linger_enabled(timeout=min(STATUS_COMMAND_TIMEOUT_SECONDS, remaining))
+        if remaining > 0
+        else False
+    )
     return {
         "service": SERVICE_NAME,
         "timer": TIMER_NAME,
@@ -244,5 +285,5 @@ def status() -> dict:
         "next_elapse": next_run,
         "last_result": last_result,
         "list_timers": listing,
-        "linger": linger_enabled(),
+        "linger": linger,
     }

@@ -105,10 +105,14 @@ systemctl --user enable --now dailymail.timer    # resume scheduling
 surface. It emits `schema_version: "controlpanel.status.v1"`, `project`, an
 UTC observation timestamp, overall health, separate retrieval and digest
 components, schedule state, bounded recent runs, parking-cache summaries and
-problems. It reads the existing SQLite database in read-only mode and asks
+problems. Components use the shared `id`, `name`, `health` and `summary`
+fields, while metrics are deliberately flat scalar values and recent runs use
+the shared start/finish/success/summary shape. It reads the existing SQLite database in read-only mode and asks
 systemd only for unit state; it never creates configuration, a database, a
 credential file, a run, or any network traffic. Errors and stored run summaries
-are bounded and redact email addresses and password/token/secret assignments.
+are bounded and redact email addresses, Bearer/Authorization tokens,
+password/token/secret assignments and URI userinfo. Systemd and loginctl status
+queries have short per-command timeouts and one total status deadline.
 
 The response intentionally contains no recipient, SMTP status detail, message
 IDs, announcement bodies, or credentials. A missing/unreadable database is an
