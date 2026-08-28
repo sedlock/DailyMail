@@ -121,7 +121,7 @@ def stub_pipeline(monkeypatch, settings_obj, employee_fixture, student_fixture):
     # Skip the real Claude call; exercise the fallback ordering path.
     monkeypatch.setattr(
         daily.curate, "curate",
-        lambda rows, target_date, settings: daily.curate.CurationOutcome(
+        lambda rows, target_date, settings, **kwargs: daily.curate.CurationOutcome(
             method="fallback", model=None,
             entries=daily.curate.fallback_rank(rows, target_date, settings),
             error="stubbed",
@@ -358,7 +358,7 @@ def test_inferred_category_persisted_from_curation(
     )
     monkeypatch.setattr(
         daily.curate, "curate",
-        lambda rows, target_date, settings: daily.curate.CurationOutcome(
+        lambda rows, target_date, settings, **kwargs: daily.curate.CurationOutcome(
             method="claude", model="m",
             entries=daily.curate.fallback_rank(rows, target_date, settings),
             inferred_categories={"Emergency Operations": 11},

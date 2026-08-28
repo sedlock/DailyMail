@@ -1,8 +1,9 @@
 # DailyMail Operations (Phase 2 — production)
 
 Companion to `docs/site-reconnaissance.md` (Phase 0),
-`docs/collector-architecture.md` (Phase 1) and `docs/parking-enrichment.md`
-(Phase 3), all of which remain accurate. This document covers the production
+`docs/collector-architecture.md` (Phase 1), `docs/parking-enrichment.md`
+(Phase 3) and `docs/calendar-and-repeats.md` (Phase 4), all of which remain
+accurate. This document covers the production
 system: history, curation, rendering, delivery and scheduling.
 
 ---
@@ -18,8 +19,12 @@ overlap lock
   -> validate (Phase 1 gates V1-V9, V12)      structural failure = no retry
   -> persist to SQLite                        versions only on real change
   -> detect substantive updates
+  -> logical repeats                          already delivered under another ID?
+  -> event candidates                         which announcements are real events
   -> parking enrichment                       cache hit = a dictionary lookup
   -> curate (Claude; deterministic fallback on any failure)
+       ranking, plus calendar relevance on the same call
+  -> calendar enrichment                      Outlook link + .ics + travel holds
   -> render HTML + plain text deterministically
   -> verify the rendering, then the message
   -> send via Gmail STARTTLS (idempotent per date+recipient)
@@ -42,6 +47,8 @@ is two HTTP requests and under two seconds.
 | SMTP failure | Retried up to 3 times, then recorded and exit non-zero. Deliberately **no** alert email — that is the channel that just failed |
 | Already delivered today | Exits cleanly without resending |
 | Parking source unreachable, resolver failure, or an unresolvable lot | Recorded in `runs.parking_stats`; the announcement shows the official campus parking map instead. **No alert**, and the digest is unaffected |
+| Event parse failure, invalid model relevance output, unresolvable venue, route lookup failure, or calendar-link generation failure | Recorded in `runs.calendar_stats` and `calendar_recommendations`. At worst one announcement loses its calendar button; a routing failure only makes the travel estimate rougher. **No alert**, and the digest is unaffected |
+| Logical-repeat detection fails | The day is left exactly as Rowan classified it. **No alert** |
 
 ---
 
@@ -62,6 +69,7 @@ uv run dailymail health --json                   # read-only controlpanel.status
 uv run dailymail status --json                   # compatibility alias for the same JSON
 uv run dailymail db-status                       # schema, counts, categories, backups
 uv run dailymail render --date 2026-08-20 --inline-images --out /tmp/preview
+uv run dailymail render --date 2026-08-20 --no-calendar   # skip calendar enrichment
 uv run dailymail inspect --date 2026-08-20       # the collection artifact
 uv run dailymail collect --date 2026-08-20       # collect only, no DB or email
 
@@ -229,7 +237,7 @@ dropping below the three most recent).
 
 ---
 
-## 4. Database schema (version 2)
+## 4. Database schema (version 3)
 
 Plain `sqlite3`: foreign keys on, WAL, 10 s busy timeout, explicit transactions.
 One integer version in `schema_meta`; no migration framework.
@@ -251,11 +259,16 @@ One integer version in `schema_meta`; no migration framework.
 | `parking_landmarks` | Named campus features, for description evidence and campus disambiguation |
 | `announcement_parking_locations` | Which announcement referenced which lot, on which date, how it matched |
 | `parking_unresolved` | Candidates that could not be resolved, with attempt counts and reasons |
+| `event_venues` | One durable row per normalized venue: coordinate, provenance, travel mode, outbound/return minutes, routing source and fingerprint |
+| `calendar_recommendations` | One row per (date, announcement): candidate evidence, offer decision, relevance score/reason/method, attendance mode, title, event times, travel, mechanism, action URL, validation status, withheld reason |
+| `repeat_matches` | Which prior SubmissionId a repost was matched to, with method, confidence, similarity and evidence |
 
-`runs.parking_stats` holds one JSON object of per-run parking counters. The
-upgrade from version 1 is additive — `CREATE TABLE IF NOT EXISTS` plus one
-`ALTER TABLE runs ADD COLUMN` — transactional, idempotent, and it neither
-rewrites nor reads any existing announcement row.
+`runs.parking_stats` and `runs.calendar_stats` each hold one JSON object of
+per-run counters. `daily_records.display_status` holds what the digest shows;
+`daily_records.status` keeps Rowan's own classification and is never
+overwritten. Every upgrade is additive — `CREATE TABLE IF NOT EXISTS` plus
+guarded `ALTER TABLE ... ADD COLUMN` — transactional, idempotent, and it
+neither rewrites nor reads any existing announcement row.
 
 ### Substantive change detection
 
@@ -272,7 +285,7 @@ The per-day `changed` flag is sticky: re-running a date keeps the badge.
 
 ## 5. New versus Standing
 
-Unchanged from Phase 1 and still source-driven:
+Derivation is unchanged from Phase 1 and still source-driven:
 
 ```
 New       when min(DistributionDates) == digest date
@@ -282,6 +295,19 @@ Standing  otherwise
 `first_observed_at` is stored separately and is never used for this
 classification. Validated 13/13 against Rowan's own Employee Daily Mail for
 2026-08-20.
+
+Phase 4 adds one **separate** question on top, asked only of announcements Rowan
+calls New: *has this reader already been sent this, under a different
+SubmissionId?* Rowan submitters routinely repost rather than extend a
+distribution list — nine announcements did so in the first production week — so
+identical text arrives labelled New days after the reader received it.
+
+A conservative deterministic check (identical normalized title, same category
+and audience, body similarity ≥ 0.85, compatible event occurrence, and almost no
+distinctive words lost) sets `display_status = 'Standing'`. A genuinely new
+occurrence of a recurring event stays New, and anything ambiguous stays New.
+Rowan's own classification is preserved in `daily_records.status`.
+`docs/calendar-and-repeats.md` §6.
 
 ---
 
@@ -435,6 +461,26 @@ parts. Anything undecodable, insecure, or over budget is replaced with a visible
 digest. Measured: the 1.21 MB inline image in announcement 6602 became a 91 KB
 JPEG at 1500×600.
 
+### Calendar action
+
+An announcement describing a genuinely relevant scheduled event gets one compact
+`CALENDAR` block between its metadata and its body: the event name, `Wed, Oct 14
+· 10:00 AM–12:00 PM`, the location and attendance mode, an `Add to Calendar`
+button, and a line stating any travel reserved. The button is an Outlook
+compose deep link; a standards-compliant `.ics` is attached beside it, carrying
+the travel holds as separate VEVENTs. The plain-text alternative carries
+`Add to calendar: <URL>` and the attachment name. Like parking, the block is
+additive and is deliberately **not** part of the digest content hash. Full
+detail in `docs/calendar-and-repeats.md`.
+
+### Duplicate title and category
+
+Rowan bodies often open by repeating their own subject, which the card already
+shows. That first block is suppressed at render time only, and only on an exact
+normalized match with no link, image or extra text — the stored `full_body` is
+never modified. A New card inside a category group does not repeat the group's
+category; a Standing card, which sits in one globally ranked list, keeps it.
+
 ### Parking location
 
 An announcement naming a parking facility gets one compact block between its
@@ -529,6 +575,14 @@ browser.
 * If Rowan edits an announcement's distribution dates after publication, the
   derived `New`/`Standing` status can shift between runs. `first_distribution_date`
   is stored so this is detectable.
+* The `Add to Calendar` button uses Outlook's compose deep link, which Microsoft
+  has not documented. That is why it is paired with a standards-based `.ics`
+  attachment rather than relied on alone; if the endpoint ever changes, the
+  attachment still works. Only the attachment can carry travel holds — the
+  compose link takes a single event.
+* Travel routing uses the public OSRM demo endpoint, at most once per newly seen
+  venue. It is deliberately not a dependency: a failure yields a conservative
+  distance-based estimate, tagged as estimated in the callout.
 * Images are re-encoded as JPEG flattened onto white. That suits the white email
   background and text-heavy flyers; a logo relying on transparency over a dark
   background would look different from the source.

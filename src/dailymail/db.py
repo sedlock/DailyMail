@@ -18,7 +18,7 @@ from pathlib import Path
 
 from .settings import data_dir
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 BUSY_TIMEOUT_MS = 10_000
 
 OFFICIAL_URL_TEMPLATE = (
@@ -311,6 +311,102 @@ CREATE INDEX IF NOT EXISTS idx_announcement_parking_date
 """
 
 
+# --- schema v3: calendar actions, event venues, logical repeats ---------------
+#
+# Three additive concerns, kept in their own tables for the same reason parking
+# is: they are derived, auditable and rebuildable, and none of them may ever be
+# able to touch announcement history.
+#
+#   * `event_venues`      reference data -- a venue's coordinates and the travel
+#                         time from the configured base. Venues repeat weekly,
+#                         so this is what stops us geocoding the same ballroom
+#                         every morning.
+#   * `calendar_recommendations`  one row per (date, announcement): what we
+#                         decided and why, so behaviour can be tuned without
+#                         regenerating anything.
+#   * `repeat_matches`    which prior announcement a new SubmissionId was found
+#                         to be a logical repeat of, with the evidence.
+CALENDAR_SCHEMA = """
+CREATE TABLE IF NOT EXISTS event_venues (
+    venue_id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    normalized_venue    TEXT NOT NULL UNIQUE,
+    display_name        TEXT NOT NULL,
+    campus              TEXT,
+    latitude            REAL,
+    longitude           REAL,
+    source              TEXT NOT NULL,
+    source_detail       TEXT,
+    travel_mode         TEXT,
+    outbound_minutes    INTEGER,
+    return_minutes      INTEGER,
+    distance_metres     REAL,
+    routing_source      TEXT,
+    routing_fingerprint TEXT,
+    routing_estimated   INTEGER NOT NULL DEFAULT 0,
+    first_seen_at       TEXT NOT NULL,
+    last_verified_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS calendar_recommendations (
+    target_date         TEXT NOT NULL,
+    submission_id       INTEGER NOT NULL
+                          REFERENCES announcements(submission_id) ON DELETE CASCADE,
+    version_id          INTEGER,
+    is_event_candidate  INTEGER NOT NULL DEFAULT 0,
+    candidate_evidence  TEXT,
+    offer_calendar      INTEGER NOT NULL DEFAULT 0,
+    relevance_score     REAL,
+    relevance_reason    TEXT,
+    relevance_method    TEXT,
+    relevance_model     TEXT,
+    attendance_mode     TEXT,
+    calendar_title      TEXT,
+    event_date          TEXT,
+    start_datetime      TEXT,
+    end_datetime        TEXT,
+    timezone            TEXT,
+    location            TEXT,
+    venue_id            INTEGER REFERENCES event_venues(venue_id) ON DELETE SET NULL,
+    travel_required     INTEGER NOT NULL DEFAULT 0,
+    travel_mode         TEXT,
+    travel_minutes_before INTEGER,
+    travel_minutes_after  INTEGER,
+    travel_estimated    INTEGER NOT NULL DEFAULT 0,
+    mechanism           TEXT,
+    action_url          TEXT,
+    ics_filename        TEXT,
+    ics_bytes           INTEGER,
+    validation_status   TEXT NOT NULL DEFAULT 'ok',
+    withheld_reason     TEXT,
+    created_at          TEXT NOT NULL,
+    PRIMARY KEY (target_date, submission_id)
+);
+
+-- A newly created Rowan SubmissionId that carries the same informational
+-- announcement as one already delivered. Rowan submitters routinely repost
+-- rather than extend a distribution list, so this is observed behaviour, not a
+-- hypothetical. Evidence is stored so a match can be audited or reversed.
+CREATE TABLE IF NOT EXISTS repeat_matches (
+    submission_id       INTEGER PRIMARY KEY
+                          REFERENCES announcements(submission_id) ON DELETE CASCADE,
+    matched_submission_id INTEGER NOT NULL
+                          REFERENCES announcements(submission_id) ON DELETE CASCADE,
+    family_key          TEXT NOT NULL,
+    method              TEXT NOT NULL,
+    confidence          REAL NOT NULL,
+    body_similarity     REAL,
+    materially_changed  INTEGER NOT NULL DEFAULT 0,
+    evidence            TEXT,
+    first_detected_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_recs_date
+    ON calendar_recommendations (target_date);
+CREATE INDEX IF NOT EXISTS idx_repeat_family ON repeat_matches (family_key);
+"""
+
+
+
 def now_utc() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -439,9 +535,30 @@ def _upgrade_to_v2(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE runs ADD COLUMN parking_stats TEXT")
 
 
+def _upgrade_to_v3(connection: sqlite3.Connection) -> None:
+    """Add calendar/venue/repeat tables and the two derived announcement columns.
+
+    Additive and idempotent, exactly like v2: `CREATE TABLE IF NOT EXISTS` plus
+    guarded `ALTER TABLE ... ADD COLUMN`. No existing row is rewritten and no
+    announcement content is read, so a failure leaves v2 intact.
+
+    `daily_records.display_status` is deliberately a *separate* column from
+    `status`. `status` stays exactly what Rowan's own distribution dates say --
+    the source semantics are never lost -- while `display_status` is what the
+    digest shows once logical-repeat detection has had its say.
+    """
+    connection.executescript(CALENDAR_SCHEMA)
+    if "display_status" not in _column_names(connection, "daily_records"):
+        connection.execute(
+            "ALTER TABLE daily_records ADD COLUMN display_status TEXT"
+        )
+    if "calendar_stats" not in _column_names(connection, "runs"):
+        connection.execute("ALTER TABLE runs ADD COLUMN calendar_stats TEXT")
+
+
 # Applied in ascending order for any version below SCHEMA_VERSION. Each entry
 # must be safe to run against an already-upgraded database.
-MIGRATIONS = {2: _upgrade_to_v2}
+MIGRATIONS = {2: _upgrade_to_v2, 3: _upgrade_to_v3}
 
 
 def initialize(connection: sqlite3.Connection) -> int:
@@ -790,7 +907,13 @@ def record_daily(
     changed: bool,
     observed_at: str,
 ) -> None:
-    """Upsert the per-day row. `changed` is sticky so re-running a date keeps it."""
+    """Upsert the per-day row. `changed` is sticky so re-running a date keeps it.
+
+    `status` is Rowan's own source semantics and is never overwritten by
+    anything downstream. `display_status` is left alone here: logical-repeat
+    detection owns it, and a re-ingest must not silently discard a decision it
+    already made for this date.
+    """
     connection.execute(
         """
         INSERT INTO daily_records (target_date, submission_id, version_id, status,
@@ -805,6 +928,30 @@ def record_daily(
     )
 
 
+def set_display_status(
+    connection: sqlite3.Connection,
+    *,
+    target_date: str,
+    submission_id: int,
+    display_status: str | None,
+    mark_changed: bool = False,
+) -> None:
+    """Record what the digest should show, leaving Rowan's own `status` intact.
+
+    `mark_changed` exists for one case: a repost that *is* a logical repeat but
+    was substantively revised. Rowan gave it a fresh SubmissionId, so the normal
+    version-diff sees a first sighting and no UPDATED badge -- yet relative to
+    what the reader was actually sent, it did change. Like the flag it sets,
+    this is sticky and never cleared here.
+    """
+    connection.execute(
+        "UPDATE daily_records SET display_status = ?, "
+        "changed = MAX(changed, ?) "
+        "WHERE target_date = ? AND submission_id = ?",
+        (display_status, int(bool(mark_changed)), target_date, submission_id),
+    )
+
+
 # --- reads used by curation and rendering -----------------------------------
 
 
@@ -816,7 +963,12 @@ def digest_rows(connection: sqlite3.Connection, target_date: str) -> list[sqlite
             SELECT
                 d.target_date,
                 d.submission_id,
-                d.status,
+                -- What the digest shows. Rowan's own classification stays
+                -- available as `source_status`; only logical-repeat detection
+                -- can make these differ.
+                COALESCE(d.display_status, d.status) AS status,
+                d.status AS source_status,
+                d.display_status,
                 d.changed,
                 v.*,
                 a.official_url,
@@ -841,11 +993,17 @@ def digest_rows(connection: sqlite3.Connection, target_date: str) -> list[sqlite
                     AND EXISTS (SELECT 1 FROM daily_records dr
                                  WHERE dr.target_date = del.target_date
                                    AND dr.submission_id = d.submission_id)
-                 ) AS previous_deliveries
+                 ) AS previous_deliveries,
+                rm.matched_submission_id AS repeat_of_submission_id,
+                rm.family_key            AS repeat_family_key,
+                rm.confidence            AS repeat_confidence,
+                rm.method                AS repeat_method,
+                rm.materially_changed    AS repeat_materially_changed
             FROM daily_records d
             JOIN announcement_versions v ON v.version_id = d.version_id
             JOIN announcements a ON a.submission_id = d.submission_id
             LEFT JOIN categories c ON c.category_id = v.category_id
+            LEFT JOIN repeat_matches rm ON rm.submission_id = d.submission_id
             WHERE d.target_date = ?
             ORDER BY d.submission_id
             """,
@@ -859,8 +1017,10 @@ def counts_for_date(connection: sqlite3.Connection, target_date: str) -> dict:
         """
         SELECT
           COUNT(*) AS unique_count,
-          SUM(CASE WHEN status = 'New' THEN 1 ELSE 0 END) AS new_count,
-          SUM(CASE WHEN status = 'Standing' THEN 1 ELSE 0 END) AS standing_count,
+          SUM(CASE WHEN COALESCE(display_status, status) = 'New' THEN 1 ELSE 0 END)
+            AS new_count,
+          SUM(CASE WHEN COALESCE(display_status, status) = 'Standing' THEN 1 ELSE 0 END)
+            AS standing_count,
           SUM(changed) AS changed_count
         FROM daily_records WHERE target_date = ?
         """,
@@ -925,6 +1085,7 @@ def finish_run(connection: sqlite3.Connection, run_id: int, **fields) -> None:
         "email_status",
         "error_summary",
         "parking_stats",
+        "calendar_stats",
     }
     updates = {k: v for k, v in fields.items() if k in allowed}
     updates["completed_at"] = now_utc()
@@ -1053,4 +1214,275 @@ def statistics(connection: sqlite3.Connection) -> dict:
         "parking_sources": scalar("SELECT COUNT(*) FROM parking_sources"),
         "parking_unresolved": scalar("SELECT COUNT(*) FROM parking_unresolved"),
         "parking_landmarks": scalar("SELECT COUNT(*) FROM parking_landmarks"),
+        "event_venues": scalar("SELECT COUNT(*) FROM event_venues"),
+        "calendar_recommendations": scalar(
+            "SELECT COUNT(*) FROM calendar_recommendations"
+        ),
+        "calendar_actions_offered": scalar(
+            "SELECT COUNT(*) FROM calendar_recommendations WHERE offer_calendar = 1"
+        ),
+        "repeat_matches": scalar("SELECT COUNT(*) FROM repeat_matches"),
     }
+
+
+# --- calendar, venues and logical repeats ------------------------------------
+#
+# All three are derived data. Nothing here can modify an announcement, a
+# version, a distribution date or a delivery, and every write is idempotent so
+# re-running a date produces the same rows rather than a growing pile.
+
+_CALENDAR_COLUMNS = (
+    "target_date",
+    "submission_id",
+    "version_id",
+    "is_event_candidate",
+    "candidate_evidence",
+    "offer_calendar",
+    "relevance_score",
+    "relevance_reason",
+    "relevance_method",
+    "relevance_model",
+    "attendance_mode",
+    "calendar_title",
+    "event_date",
+    "start_datetime",
+    "end_datetime",
+    "timezone",
+    "location",
+    "venue_id",
+    "travel_required",
+    "travel_mode",
+    "travel_minutes_before",
+    "travel_minutes_after",
+    "travel_estimated",
+    "mechanism",
+    "action_url",
+    "ics_filename",
+    "ics_bytes",
+    "validation_status",
+    "withheld_reason",
+    "created_at",
+)
+
+
+def save_calendar_recommendations(
+    connection: sqlite3.Connection, target_date: str, records: list[dict]
+) -> None:
+    """Replace the day's calendar decisions in one transaction.
+
+    Idempotent by construction: the same announcement content on the same date
+    produces the same rows, so a re-run is a no-op rather than a duplicate.
+    """
+    stamp = now_utc()
+    with transaction(connection):
+        connection.execute(
+            "DELETE FROM calendar_recommendations WHERE target_date = ?",
+            (target_date,),
+        )
+        if not records:
+            return
+        placeholders = ", ".join("?" for _ in _CALENDAR_COLUMNS)
+        connection.executemany(
+            f"INSERT INTO calendar_recommendations "
+            f"({', '.join(_CALENDAR_COLUMNS)}) VALUES ({placeholders})",
+            [
+                tuple(
+                    stamp
+                    if column == "created_at"
+                    else (target_date if column == "target_date" else record.get(column))
+                    for column in _CALENDAR_COLUMNS
+                )
+                for record in records
+            ],
+        )
+
+
+def calendar_recommendations(
+    connection: sqlite3.Connection, target_date: str
+) -> list[sqlite3.Row]:
+    return list(
+        connection.execute(
+            "SELECT * FROM calendar_recommendations WHERE target_date = ? "
+            "ORDER BY submission_id",
+            (target_date,),
+        )
+    )
+
+
+def venue_by_normalized(
+    connection: sqlite3.Connection, normalized_venue: str
+) -> sqlite3.Row | None:
+    return connection.execute(
+        "SELECT * FROM event_venues WHERE normalized_venue = ?",
+        (normalized_venue,),
+    ).fetchone()
+
+
+def upsert_venue(connection: sqlite3.Connection, record: dict) -> int:
+    """Insert or refresh one venue. Returns its `venue_id`.
+
+    Travel numbers are only overwritten when the caller actually computed new
+    ones, so a routing outage can never downgrade a good cached estimate.
+    """
+    stamp = now_utc()
+    normalized = record["normalized_venue"]
+    existing = venue_by_normalized(connection, normalized)
+    if existing is None:
+        cursor = connection.execute(
+            """
+            INSERT INTO event_venues (normalized_venue, display_name, campus,
+                latitude, longitude, source, source_detail, travel_mode,
+                outbound_minutes, return_minutes, distance_metres, routing_source,
+                routing_fingerprint, routing_estimated, first_seen_at,
+                last_verified_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                normalized,
+                record["display_name"],
+                record.get("campus"),
+                record.get("latitude"),
+                record.get("longitude"),
+                record["source"],
+                record.get("source_detail"),
+                record.get("travel_mode"),
+                record.get("outbound_minutes"),
+                record.get("return_minutes"),
+                record.get("distance_metres"),
+                record.get("routing_source"),
+                record.get("routing_fingerprint"),
+                int(bool(record.get("routing_estimated"))),
+                stamp,
+                stamp,
+            ),
+        )
+        return int(cursor.lastrowid)
+
+    has_travel = record.get("outbound_minutes") is not None
+    connection.execute(
+        """
+        UPDATE event_venues SET
+            display_name        = COALESCE(?, display_name),
+            campus              = COALESCE(?, campus),
+            latitude            = COALESCE(?, latitude),
+            longitude           = COALESCE(?, longitude),
+            source              = COALESCE(?, source),
+            source_detail       = COALESCE(?, source_detail),
+            travel_mode         = CASE WHEN ? THEN ? ELSE travel_mode END,
+            outbound_minutes    = CASE WHEN ? THEN ? ELSE outbound_minutes END,
+            return_minutes      = CASE WHEN ? THEN ? ELSE return_minutes END,
+            distance_metres     = COALESCE(?, distance_metres),
+            routing_source      = CASE WHEN ? THEN ? ELSE routing_source END,
+            routing_fingerprint = CASE WHEN ? THEN ? ELSE routing_fingerprint END,
+            routing_estimated   = CASE WHEN ? THEN ? ELSE routing_estimated END,
+            last_verified_at    = ?
+        WHERE normalized_venue = ?
+        """,
+        (
+            record.get("display_name"),
+            record.get("campus"),
+            record.get("latitude"),
+            record.get("longitude"),
+            record.get("source"),
+            record.get("source_detail"),
+            has_travel, record.get("travel_mode"),
+            has_travel, record.get("outbound_minutes"),
+            has_travel, record.get("return_minutes"),
+            record.get("distance_metres"),
+            has_travel, record.get("routing_source"),
+            has_travel, record.get("routing_fingerprint"),
+            has_travel, int(bool(record.get("routing_estimated"))),
+            stamp,
+            normalized,
+        ),
+    )
+    return int(existing["venue_id"])
+
+
+def record_repeat_match(connection: sqlite3.Connection, record: dict) -> None:
+    """Persist one logical-repeat determination, keeping its first-detected time."""
+    connection.execute(
+        """
+        INSERT INTO repeat_matches (submission_id, matched_submission_id,
+            family_key, method, confidence, body_similarity, materially_changed,
+            evidence, first_detected_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(submission_id) DO UPDATE SET
+            matched_submission_id = excluded.matched_submission_id,
+            family_key            = excluded.family_key,
+            method                = excluded.method,
+            confidence            = excluded.confidence,
+            body_similarity       = excluded.body_similarity,
+            materially_changed    = excluded.materially_changed,
+            evidence              = excluded.evidence
+        """,
+        (
+            int(record["submission_id"]),
+            int(record["matched_submission_id"]),
+            record["family_key"],
+            record["method"],
+            float(record["confidence"]),
+            record.get("body_similarity"),
+            int(bool(record.get("materially_changed"))),
+            record.get("evidence"),
+            now_utc(),
+        ),
+    )
+
+
+def repeat_match(
+    connection: sqlite3.Connection, submission_id: int
+) -> sqlite3.Row | None:
+    return connection.execute(
+        "SELECT * FROM repeat_matches WHERE submission_id = ?", (int(submission_id),)
+    ).fetchone()
+
+
+def delivered_history(
+    connection: sqlite3.Connection, before_date: str
+) -> list[sqlite3.Row]:
+    """Every announcement actually delivered to the reader before `before_date`.
+
+    Deliberately keyed on a *successful delivery*, not merely on having been
+    collected: "the reader has already seen this" is the only claim that
+    justifies demoting something to Standing.
+    """
+    return list(
+        connection.execute(
+            """
+            SELECT
+                a.submission_id,
+                seen.first_delivered_date,
+                seen.last_delivered_date,
+                seen.delivered_days,
+                v.title,
+                v.body_text,
+                v.full_body,
+                v.category_id,
+                v.source_audience,
+                v.is_event,
+                v.event_date,
+                v.event_start_time,
+                v.event_location,
+                v.contact_email,
+                v.submitted_by_email,
+                v.content_hash
+            FROM (
+                SELECT d.submission_id,
+                       MIN(d.target_date) AS first_delivered_date,
+                       MAX(d.target_date) AS last_delivered_date,
+                       COUNT(*)           AS delivered_days
+                  FROM daily_records d
+                 WHERE d.target_date < ?
+                   AND EXISTS (SELECT 1 FROM deliveries del
+                                WHERE del.target_date = d.target_date
+                                  AND del.state = 'sent')
+                 GROUP BY d.submission_id
+            ) AS seen
+            JOIN announcements a ON a.submission_id = seen.submission_id
+            JOIN announcement_versions v ON v.version_id = a.current_version_id
+            ORDER BY a.submission_id
+            """,
+            (before_date,),
+        )
+    )

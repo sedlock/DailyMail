@@ -35,7 +35,7 @@ def parked_pipeline(monkeypatch, settings_obj, employee_fixture, student_fixture
     )
     monkeypatch.setattr(
         daily.curate, "curate",
-        lambda rows, target_date, settings: daily.curate.CurationOutcome(
+        lambda rows, target_date, settings, **kwargs: daily.curate.CurationOutcome(
             method="fallback", model=None,
             entries=daily.curate.fallback_rank(rows, target_date, settings),
             error="stubbed",
@@ -260,7 +260,7 @@ def test_a_parking_source_outage_does_not_alert_or_fail(
     )
     monkeypatch.setattr(
         daily.curate, "curate",
-        lambda rows, target_date, settings: daily.curate.CurationOutcome(
+        lambda rows, target_date, settings, **kwargs: daily.curate.CurationOutcome(
             method="fallback", model=None,
             entries=daily.curate.fallback_rank(rows, target_date, settings),
         ),

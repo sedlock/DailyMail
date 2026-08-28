@@ -130,6 +130,46 @@ min_confidence = "medium"
 # Cap the callouts on a single announcement so a lot list cannot dominate it.
 max_callouts = 6
 
+[calendar]
+# Intelligent Add-to-Calendar actions on announcements that describe a real,
+# scheduled, relevant event. Enrichment only: it can never block a digest.
+enabled = true
+# Offer the action only at or above this relevance confidence (0.0-1.0).
+# Raise it to be stricter, lower it to see more calendar buttons.
+relevance_threshold = 0.6
+# Cap the number of calendar actions in one digest.
+max_actions = 8
+# Attach a standards-compliant .ics per offered event (RFC 5545). This is the
+# mechanism that can carry travel holds; the button URL cannot.
+attach_ics = true
+# Where the reader normally is. Used only to work out travel time; it is a
+# calculation reference and is not advertised in the email.
+base_address = "201 Mullica Hill Rd, Glassboro, NJ 08028"
+base_latitude = 39.70791
+base_longitude = -75.11288
+base_campus = "glassboro"
+# Reserve travel time around events that need physical movement.
+travel_enabled = true
+# At or below this distance from base the trip is treated as a campus walk.
+walk_max_metres = 1200
+walking_speed_mps = 1.3
+# Padding added to a walk, and to each leg of a drive.
+walk_padding_minutes = 3
+drive_arrival_padding_minutes = 10
+drive_return_padding_minutes = 5
+# Travel blocks are rounded up to this many minutes and never exceed the cap.
+travel_rounding_minutes = 5
+travel_min_minutes = 10
+travel_max_minutes = 90
+# Read-only OSRM route lookup for genuine drives. Never a hard dependency: a
+# failure falls back to a conservative distance estimate, tagged as estimated,
+# and never suppresses the calendar action.
+routing_enabled = true
+routing_url = "https://router.project-osrm.org"
+routing_timeout_seconds = 6
+# Re-verify a cached venue's travel time only this rarely. Venues repeat weekly.
+venue_cache_days = 180
+
 [images]
 # Inline data: URI images are decoded, downscaled and re-embedded as CID parts.
 max_width_px = 1500
@@ -210,6 +250,27 @@ class Settings:
     parking_description_batch: int = 10
     parking_min_confidence: str = "medium"
     parking_max_callouts: int = 6
+    calendar_enabled: bool = True
+    calendar_relevance_threshold: float = 0.6
+    calendar_max_actions: int = 8
+    calendar_attach_ics: bool = True
+    calendar_base_address: str = "201 Mullica Hill Rd, Glassboro, NJ 08028"
+    calendar_base_latitude: float = 39.70791
+    calendar_base_longitude: float = -75.11288
+    calendar_base_campus: str = "glassboro"
+    calendar_travel_enabled: bool = True
+    calendar_walk_max_metres: float = 1200.0
+    calendar_walking_speed_mps: float = 1.3
+    calendar_walk_padding_minutes: int = 3
+    calendar_drive_arrival_padding_minutes: int = 10
+    calendar_drive_return_padding_minutes: int = 5
+    calendar_travel_rounding_minutes: int = 5
+    calendar_travel_min_minutes: int = 10
+    calendar_travel_max_minutes: int = 90
+    calendar_routing_enabled: bool = True
+    calendar_routing_url: str = "https://router.project-osrm.org"
+    calendar_routing_timeout_seconds: int = 6
+    calendar_venue_cache_days: int = 180
     category_priority: tuple[str, ...] = field(default=())
     locked_category_count: int = LOCKED_CATEGORY_COUNT
 
@@ -272,6 +333,7 @@ def load(path: Path | None = None) -> Settings:
     collector = raw.get("collector", {})
     categories = raw.get("categories", {})
     parking_cfg = raw.get("parking", {})
+    calendar_cfg = raw.get("calendar", {})
 
     priority = tuple(categories.get("priority") or DEFAULT_CATEGORY_PRIORITY)
 
@@ -324,6 +386,43 @@ def load(path: Path | None = None) -> Settings:
         parking_description_batch=int(parking_cfg.get("description_batch", 10)),
         parking_min_confidence=str(parking_cfg.get("min_confidence", "medium")),
         parking_max_callouts=int(parking_cfg.get("max_callouts", 6)),
+        calendar_enabled=bool(calendar_cfg.get("enabled", True)),
+        calendar_relevance_threshold=float(
+            calendar_cfg.get("relevance_threshold", 0.6)
+        ),
+        calendar_max_actions=int(calendar_cfg.get("max_actions", 8)),
+        calendar_attach_ics=bool(calendar_cfg.get("attach_ics", True)),
+        calendar_base_address=str(
+            calendar_cfg.get("base_address", "201 Mullica Hill Rd, Glassboro, NJ 08028")
+        ),
+        calendar_base_latitude=float(calendar_cfg.get("base_latitude", 39.70791)),
+        calendar_base_longitude=float(calendar_cfg.get("base_longitude", -75.11288)),
+        calendar_base_campus=str(calendar_cfg.get("base_campus", "glassboro")),
+        calendar_travel_enabled=bool(calendar_cfg.get("travel_enabled", True)),
+        calendar_walk_max_metres=float(calendar_cfg.get("walk_max_metres", 1200)),
+        calendar_walking_speed_mps=float(calendar_cfg.get("walking_speed_mps", 1.3)),
+        calendar_walk_padding_minutes=int(
+            calendar_cfg.get("walk_padding_minutes", 3)
+        ),
+        calendar_drive_arrival_padding_minutes=int(
+            calendar_cfg.get("drive_arrival_padding_minutes", 10)
+        ),
+        calendar_drive_return_padding_minutes=int(
+            calendar_cfg.get("drive_return_padding_minutes", 5)
+        ),
+        calendar_travel_rounding_minutes=max(
+            1, int(calendar_cfg.get("travel_rounding_minutes", 5))
+        ),
+        calendar_travel_min_minutes=int(calendar_cfg.get("travel_min_minutes", 10)),
+        calendar_travel_max_minutes=int(calendar_cfg.get("travel_max_minutes", 90)),
+        calendar_routing_enabled=bool(calendar_cfg.get("routing_enabled", True)),
+        calendar_routing_url=str(
+            calendar_cfg.get("routing_url", "https://router.project-osrm.org")
+        ).rstrip("/"),
+        calendar_routing_timeout_seconds=int(
+            calendar_cfg.get("routing_timeout_seconds", 6)
+        ),
+        calendar_venue_cache_days=int(calendar_cfg.get("venue_cache_days", 180)),
         category_priority=priority,
         locked_category_count=int(
             categories.get("locked_count", LOCKED_CATEGORY_COUNT)

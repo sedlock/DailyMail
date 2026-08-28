@@ -12,8 +12,9 @@ Every morning DailyMail collects every announcement valid for that date from bot
 the Employee and Student views, validates completeness against the source's own
 counts, records history in SQLite, works out what is new and what has
 substantively changed, resolves any parking lot it mentions to a real place on a
-map, asks Claude to rank the day, renders one email containing the **complete**
-text of every announcement, and sends it.
+map, works out which announcements describe an event worth putting on the
+reader's calendar, asks Claude to rank the day, renders one email containing the
+**complete** text of every announcement, and sends it.
 
 The email is the product: no navigation, no clicking through, no summaries. Each
 announcement appears once, in full, with its event details, contact/submitter/
@@ -23,7 +24,7 @@ approver metadata, and a direct link to the official Rowan page for verification
 
 ```sh
 uv sync
-uv run pytest                      # 632 tests, no network required
+uv run pytest                      # 873 tests, no network required
 
 uv run dailymail run-daily         # the full pipeline for today
 uv run dailymail status            # runs, deliveries, timer state
@@ -66,7 +67,8 @@ DAILYMAIL_LIVE_PARKING=1 uv run pytest tests/test_parking_live.py
 
 Operational reference — commands, exit codes, failure behaviour, troubleshooting:
 **`docs/operations.md`**. Parking geography, sources and cache:
-**`docs/parking-enrichment.md`**.
+**`docs/parking-enrichment.md`**. Calendar actions, travel reservation and
+logical-repeat detection: **`docs/calendar-and-repeats.md`**.
 
 ## How it works
 
@@ -75,8 +77,11 @@ Operational reference — commands, exit codes, failure behaviour, troubleshooti
           -> collect      two JSON requests to Rowan's OutSystems screen service
           -> validate     nine gates; a failure means no digest, not a bad digest
           -> persist      SQLite history, versioned only on real content change
+          -> repeats      has the reader already been sent this, under a new ID?
+          -> events       which announcements are real, schedulable events
           -> parking       cached lot geography; a hit is a dictionary lookup
-          -> curate       Claude ranks; deterministic fallback if anything fails
+          -> curate       Claude ranks and judges calendar relevance; fallback if it fails
+          -> calendar     Outlook deep link + RFC 5545 .ics, with travel holds
           -> render       deterministic HTML + plain text from stored state
           -> send         Gmail STARTTLS, idempotent per date
 ```
@@ -92,7 +97,13 @@ Seven things are worth knowing:
   tokens, retries once, then fails loudly. It never reports that as "no news".
 * **New vs Standing comes from Rowan's own data** (`min(DistributionDates) ==
   today`), validated 13/13 against a real Rowan digest — not from when DailyMail
-  happened to first see an announcement.
+  happened to first see an announcement. One second question is asked on top of
+  it: Rowan submitters routinely repost an announcement under a *new*
+  SubmissionId rather than extending its distribution dates — nine announcements
+  did so in the first production week — so something the reader was sent three
+  days ago arrives labelled New. A conservative deterministic check demotes
+  those to `STANDING`, while a genuinely new occurrence of a recurring event
+  stays New. Rowan's own classification is kept, never overwritten.
 * **Curation output is accepted only as a permutation.** Reclassifying, dropping,
   inventing or duplicating an announcement is rejected, so announcement text that
   tries to instruct the model cannot change what gets delivered.
@@ -101,6 +112,15 @@ Seven things are worth knowing:
 * **Inline images are real.** Rowan bodies embed `data:` URIs over 6 MB. Those are
   decoded, verified, downscaled and re-attached as CID parts within a byte budget;
   anything undecodable becomes a link to the source instead of a broken image.
+* **A relevant event gets an `Add to Calendar` button.** Rowan's own `Event`
+  boolean is *false* for the Provost's Town Hall, so detection reads the body:
+  the date, the two-phase schedule, the room and the hybrid note are all there.
+  Claude judges only *relevance* — riding along on the ranking call that already
+  runs, for about a hundred extra tokens — while every date, time, location and
+  link comes from deterministic extraction. The button is an Outlook compose
+  deep link; beside it is a standards-compliant `.ics` that also reserves
+  realistic travel either side, without ever altering the advertised event time.
+  `docs/calendar-and-repeats.md`.
 * **"Parking Lot O-1 will be closed" now tells you where that is.** Rowan's own
   Glassboro campus map is a Google My Maps layer, and My Maps publishes it as KML
   — so the lot names, coordinates and permit classes are official machine-readable
@@ -116,6 +136,8 @@ Seven things are worth knowing:
 src/dailymail/
   collect.py client.py discovery.py validate.py normalize.py tls.py   Phase 1 collector
   db.py ingest.py                                                     history + versioning
+  repeats.py                                                          logical-repeat detection
+  events.py travel.py calendar_action.py calendar_enrich.py           calendar actions
   curate.py                                                           Claude ranking + fallback
   sanitize.py images.py render.py templates/                          the email
   mailer.py                                                           MIME + SMTP
@@ -126,17 +148,18 @@ docs/
   collector-architecture.md Phase 1: the collector and its validation gates
   operations.md             Phase 2: running it
   parking-enrichment.md     Phase 3: parking geography, sources and cache
+  calendar-and-repeats.md   Phase 4: calendar actions, travel, logical repeats
 artifacts/reconnaissance/   sanitized fixtures the test suite runs against
 artifacts/parking/          snapshots of Rowan's authoritative parking sources
 tools/recon/                Phase 0 probes, manual diagnostics only
-tests/                      632 tests, fixture- and mock-driven
+tests/                      873 tests, fixture- and mock-driven
 ```
 
 ## Configuration
 
 `~/.config/dailymail/config.toml` — recipient, timezone, send time, Claude model,
-image budgets, retention, parking refresh policy, and the category priority order
-(first five locked).
+image budgets, retention, parking refresh policy, calendar relevance threshold
+and travel policy, and the category priority order (first five locked).
 
 `~/.config/dailymail/credentials.env` (mode 0600) — `GMAIL_SMTP_USER` and
 `GMAIL_APP_PASSWORD`. Read only inside the sending process; never logged, never

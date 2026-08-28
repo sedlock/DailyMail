@@ -7,6 +7,7 @@ transport. Nothing here touches the live Rowan service.
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import httpx
@@ -441,6 +442,17 @@ def no_parking_network_or_subprocess(request, monkeypatch):
     monkeypatch.setattr(parking_agent, "_invoke_resolver", blocked_agent)
     monkeypatch.setattr(parking_agent, "_invoke_description_writer", blocked_agent)
 
+    # Same invariant for calendar travel: "a cached venue costs nothing" has to
+    # be a tested fact. A test that wants routing injects its own `router=`.
+    from dailymail import travel
+
+    def blocked_route(*args, **kwargs):
+        raise AssertionError(
+            "a route lookup was attempted from a test; inject a router instead"
+        )
+
+    monkeypatch.setattr(travel, "osrm_duration_seconds", blocked_route)
+
 
 @pytest.fixture
 def parking_fetcher() -> "OfflineParkingFetcher":
@@ -526,3 +538,79 @@ def parking_cache(settings_obj, parking_fetcher):
     )
     yield connection
     connection.close()
+
+
+# --- the calendar acceptance event -------------------------------------------
+#
+# Rowan announcement 6694, the Provost's Town Hall of 14 October 2026, verbatim
+# from production apart from trimmed styling. It is the interesting case because
+# Rowan's own `Event` boolean is FALSE for it: the date, the two-phase schedule,
+# the room and the hybrid note all live in the body. Any detection that leans on
+# that flag misses it entirely.
+
+REFERENCE = date(2026, 8, 28)
+
+# The real 6694 body, verbatim from production, trimmed only of styling noise.
+TOWN_HALL_BODY = (
+    "<h4><span><strong>Provost’s Town Hall &amp; Social</strong></span></h4>"
+    "<p>We welcome all faculty, staff, and managers to join us for a Town Hall on "
+    "Wednesday, October 14, 2026, where Provost Voki Pophristic will share "
+    "Academic/Student Affairs updates and open the floor to questions. Following "
+    "the session and Q&amp;A, we invite you to stay to enjoy some light "
+    "refreshments, build connections, and explore opportunities for "
+    "collaboration.</p>"
+    '<p><a href="https://rowan.co1.qualtrics.com/jfe/form/SV_cIRdpy6HaBFYqBU">'
+    "<strong><u>Register Here</u></strong></a> so that we can plan for seating "
+    "and refreshments.</p>"
+    "<p><strong>Date:</strong> Wednesday, October 14, 2026</p>"
+    "<p><strong>Times:</strong></p>"
+    "<ul><li>10:00 - 11:15 - Presentation and Q&amp;A</li>"
+    "<li>11:15 - 12:00 - Social</li></ul>"
+    "<p><strong>Location:</strong> Hybrid</p>"
+    "<ul><li>Chamberlain Student Center, Eynon Ballroom <i><strong>(in-person "
+    "preferred)</strong></i></li>"
+    "<li>WebEx <strong>(Register for the link)</strong></li></ul>"
+    "<p><strong>Who:</strong> This event is open to all faculty, staff, and "
+    "managers</p>"
+    '<p>If there are any topics you would like to hear about, please '
+    '<a href="https://rowan.co1.qualtrics.com/jfe/form/SV_4V0aCKxrPRWxvwO">'
+    "submit them anonymously here</a>.</p>"
+    "<p>Questions can be directed to Sarah Fobes.</p>"
+)
+
+TOWN_HALL_TEXT = """Provost’s Town Hall & Social
+We welcome all faculty, staff, and managers to join us for a Town Hall on Wednesday, October 14, 2026, where Provost Voki Pophristic will share Academic/Student Affairs updates and open the floor to questions. Following the session and Q&A, we invite you to stay to enjoy some light refreshments, build connections, and explore opportunities for collaboration.
+Register Here so that we can plan for seating and refreshments.
+Date: Wednesday, October 14, 2026
+Times:
+10:00 - 11:15 - Presentation and Q&A
+11:15 - 12:00 - Social
+
+Location: Hybrid
+Chamberlain Student Center, Eynon Ballroom (in-person preferred)
+WebEx (Register for the link)
+
+Who: This event is open to all faculty, staff, and managers
+If there are any topics you would like to hear about, please submit them anonymously here.
+Questions can be directed to Sarah Fobes."""
+
+
+def make_town_hall_row(**overrides) -> dict:
+    row = {
+        "submission_id": 6694,
+        "title": "Provost's Town Hall - Oct 14",
+        "full_body": TOWN_HALL_BODY,
+        "body_text": TOWN_HALL_TEXT,
+        "is_event": 0,
+        "event_name": None,
+        "event_date": None,
+        "event_start_time": None,
+        "event_end_time": None,
+        "event_location": None,
+        "category_title": "Glassboro Campus",
+        "source_audience": "Employees",
+        "content_hash": "hash-6694",
+        "official_url": "https://apps.rowan.edu/RowanAnnouncer/Announcement?SubmissionId=6694",
+    }
+    row.update(overrides)
+    return row

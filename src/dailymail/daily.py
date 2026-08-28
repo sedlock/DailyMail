@@ -29,6 +29,7 @@ from zoneinfo import ZoneInfo
 from . import collect as collector
 from . import config as collector_config
 from . import (
+    calendar_enrich,
     credentials,
     curate,
     db,
@@ -37,6 +38,7 @@ from . import (
     maintenance,
     parking_enrich,
     render,
+    repeats,
 )
 from .errors import (
     DailyMailError,
@@ -79,6 +81,8 @@ class RunResult:
     maintenance: dict = field(default_factory=dict)
     delivery_id: int | None = None
     parking: dict = field(default_factory=dict)
+    calendar: dict = field(default_factory=dict)
+    repeat_overrides: int = 0
 
 
 class RunLock:
@@ -216,7 +220,27 @@ def run_daily(
 
             rows = db.digest_rows(connection, date_value)
 
-            # 6. Parking enrichment. Additive, non-critical, and cheap: a cached
+            # 6. Logical-repeat detection. Rowan submitters routinely repost an
+            # announcement under a new SubmissionId rather than extending its
+            # distribution dates, which makes something the reader was sent days
+            # ago arrive labelled New. This is asked *after* Rowan's own
+            # classification and only changes `display_status`; the source
+            # semantics in `daily_records.status` are never overwritten.
+            result.repeat_overrides = _apply_logical_repeats(
+                connection, rows, date_value
+            )
+            if result.repeat_overrides:
+                rows = db.digest_rows(connection, date_value)
+                counts = db.counts_for_date(connection, date_value)
+                result.counts = counts
+
+            # 6b. Event candidate detection, before curation so the relevance
+            # question can ride along on the model call that already happens.
+            event_candidates, event_diagnostics = calendar_enrich.detect_candidates(
+                rows, target_date=date_value, settings=settings
+            )
+
+            # 6c. Parking enrichment. Additive, non-critical, and cheap: a cached
             # lot is a dictionary lookup. Runs after persistence and before
             # rendering, and cannot fail the run -- `enrich_digest` never raises.
             parking_callouts, parking_metrics = parking_enrich.enrich_digest(
@@ -237,7 +261,9 @@ def run_daily(
                 log.warning("parking enrichment problem: %s", problem)
 
             # 7. Curate (Claude, or deterministic fallback).
-            outcome = curate.curate(rows, date_value, settings)
+            outcome = curate.curate(
+                rows, date_value, settings, event_candidates=event_candidates
+            )
             result.curation_method = outcome.method
             result.curation_model = outcome.model
             result.curation_seconds = outcome.duration_seconds
@@ -267,6 +293,39 @@ def run_daily(
                 model=outcome.model,
             )
 
+            # 7b. Calendar enrichment. Uses curation's relevance judgement when
+            # there is one and a deterministic score when there is not, so the
+            # button keeps working on a day Claude does not. Never raises.
+            calendar_actions, calendar_metrics = calendar_enrich.enrich_digest(
+                connection,
+                rows,
+                target_date=date_value,
+                settings=settings,
+                candidates=event_candidates,
+                diagnostics=event_diagnostics,
+                curation_entries=outcome.entries,
+                curation_method=outcome.method,
+                curation_model=outcome.model,
+            )
+            result.calendar = calendar_metrics.as_dict()
+            if calendar_metrics.candidates_detected:
+                log.info(
+                    "calendar: %d candidate(s), %d action(s), %d withheld, "
+                    "%d travel-enriched, %d venue hit(s)/%d miss(es), %.3fs",
+                    calendar_metrics.candidates_detected,
+                    calendar_metrics.actions_offered,
+                    calendar_metrics.withheld_by_relevance
+                    + calendar_metrics.withheld_other,
+                    calendar_metrics.travel_enriched,
+                    calendar_metrics.venue_cache_hits,
+                    calendar_metrics.venue_cache_misses,
+                    calendar_metrics.duration_seconds,
+                )
+            for problem in calendar_metrics.errors:
+                # Recorded, never escalated: one missing calendar button is not
+                # an operator alert.
+                log.warning("calendar enrichment problem: %s", problem)
+
             # 8. Render deterministically from stored state.
             ordering = {entry["submission_id"]: entry for entry in outcome.entries}
             try:
@@ -278,6 +337,7 @@ def run_daily(
                     curation_method=outcome.method,
                     settings=settings,
                     parking=parking_callouts,
+                    calendar=calendar_actions,
                 )
                 _verify_digest(digest, rows)
             except Exception as exc:
@@ -293,6 +353,7 @@ def run_daily(
                     employee_count=counts["employee_view"],
                     student_count=counts["student_view"],
                     parking_stats=json.dumps(result.parking),
+                    calendar_stats=json.dumps(result.calendar),
                 )
                 log.error("render failed; nothing sent: %s", exc)
                 _try_alert(settings, date_value, "RenderFailure", str(exc), result)
@@ -330,6 +391,7 @@ def run_daily(
                     html=digest.html,
                     text=digest.text,
                     images=digest.images,
+                    calendar_attachments=digest.calendar_attachments,
                 )
                 result.message_bytes = prepared.size_bytes
                 result.message_id = prepared.message_id
@@ -363,6 +425,7 @@ def run_daily(
                         employee_count=counts["employee_view"],
                         student_count=counts["student_view"],
                         parking_stats=json.dumps(result.parking),
+                        calendar_stats=json.dumps(result.calendar),
                     )
                     result.status = "failed"
                     # Deliberately no alert email: the mail channel just failed.
@@ -387,9 +450,10 @@ def run_daily(
                     f"{date_value}-sent.eml", prepared.message.as_bytes()
                 )
                 log.info(
-                    "sent %s to %s (%d bytes, %d image(s))",
+                    "sent %s to %s (%d bytes, %d image(s), %d calendar file(s))",
                     digest.subject, settings.recipient,
                     prepared.size_bytes, prepared.image_count,
+                    prepared.calendar_count,
                 )
 
             # 12. Housekeeping.
@@ -409,10 +473,54 @@ def run_daily(
                 student_count=counts["student_view"],
                 error_summary=outcome.error[:500] if outcome.error else None,
                 parking_stats=json.dumps(result.parking),
+                calendar_stats=json.dumps(result.calendar),
             )
             return result
         finally:
             connection.close()
+
+
+def _apply_logical_repeats(connection, rows, target_date: str) -> int:
+    """Demote New announcements the reader has already been sent. Never raises.
+
+    Returns how many display statuses were changed. A failure here leaves the
+    day exactly as Rowan classified it, which is the safe direction: the reader
+    sees a repeat rather than losing an announcement.
+    """
+    try:
+        history = db.delivered_history(connection, target_date)
+        matches = repeats.find_repeats(rows, history)
+    except Exception as exc:  # noqa: BLE001 - classification must never fail a run
+        log.warning("logical-repeat detection failed: %s", exc)
+        return 0
+    if not matches:
+        return 0
+
+    changed = 0
+    try:
+        with db.transaction(connection):
+            for submission_id, match in matches.items():
+                db.record_repeat_match(connection, match.as_record())
+                db.set_display_status(
+                    connection,
+                    target_date=target_date,
+                    submission_id=int(submission_id),
+                    display_status=match.display_status,
+                    mark_changed=match.materially_changed,
+                )
+                changed += 1
+    except Exception as exc:  # noqa: BLE001
+        log.warning("could not persist logical-repeat overrides: %s", exc)
+        return 0
+
+    for submission_id, match in sorted(matches.items()):
+        log.info(
+            "logical repeat: %s shown as Standing -- repeats %s "
+            "(%s, similarity %.4f, delivered %s)",
+            submission_id, match.matched_submission_id, match.method,
+            match.body_similarity, match.evidence.get("prior_delivered"),
+        )
+    return changed
 
 
 def _persist_inferred_categories(connection, inferred: dict[str, int]) -> None:

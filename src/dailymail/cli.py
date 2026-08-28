@@ -94,6 +94,8 @@ def _build_parser() -> argparse.ArgumentParser:
                                     "(default: the diagnostics directory).")
     render_parser.add_argument("--no-parking", action="store_true",
                                help="Skip parking enrichment in the preview.")
+    render_parser.add_argument("--no-calendar", action="store_true",
+                               help="Skip calendar enrichment in the preview.")
     render_parser.add_argument("--inline-images", action="store_true",
                                help="Inline CID images as data URIs so the preview "
                                     "can be opened directly in a browser.")
@@ -352,6 +354,21 @@ def _cmd_run_daily(args: argparse.Namespace) -> int:
             f"new={park['new_resolutions']} unresolved={park['unresolved']} "
             f"{park['duration_seconds']}s"
         )
+    if result.calendar and result.calendar.get("candidates"):
+        cal = result.calendar
+        print(
+            f"  calendar: candidates={cal['candidates']} offered={cal['offered']} "
+            f"withheld={cal['withheld_relevance'] + cal['withheld_other']} "
+            f"travel={cal['travel_enriched']} "
+            f"venue(hit={cal['venue_hits']},miss={cal['venue_misses']},"
+            f"unresolved={cal['venue_unresolved']}) "
+            f"routes={cal['route_lookups']} {cal['duration_seconds']}s"
+        )
+    if result.repeat_overrides:
+        print(
+            f"  repeats: {result.repeat_overrides} announcement(s) shown as "
+            f"Standing (already delivered under a previous SubmissionId)"
+        )
     print(
         f"  email: {result.email_status}"
         + (f" size={result.message_bytes}B" if result.message_bytes else "")
@@ -426,9 +443,30 @@ def _cmd_render(args: argparse.Namespace) -> int:
                 allow_refresh=False, allow_resolver=False,
             )
 
+        # A preview rebuilds the calendar actions from stored state and the
+        # venue cache only: no route lookup, no model call, so a historical
+        # date renders fast and identically every time.
+        calendar_actions: dict = {}
+        calendar_metrics = None
+        if not args.no_calendar:
+            from . import calendar_enrich
+
+            candidates, diagnostics = calendar_enrich.detect_candidates(
+                rows, target_date=target, settings=settings
+            )
+            stored_judgements = _stored_calendar_judgements(connection, target)
+            calendar_actions, calendar_metrics = calendar_enrich.enrich_digest(
+                connection, rows, target_date=target, settings=settings,
+                candidates=candidates, diagnostics=diagnostics,
+                curation_entries=stored_judgements,
+                curation_method=method,
+                allow_routing=False,
+            )
+
         digest = render.render_digest(
             rows, target_date=target, counts=counts, ordering=ordering,
             curation_method=method, settings=settings, parking=parking_callouts,
+            calendar=calendar_actions,
         )
     finally:
         connection.close()
@@ -460,6 +498,26 @@ def _cmd_render(args: argparse.Namespace) -> int:
         f"ordering={method}"
     )
     print(f"  subject: {digest.subject}")
+    if calendar_metrics is not None and calendar_metrics.candidates_detected:
+        print(
+            f"  calendar: {calendar_metrics.candidates_detected} candidate(s), "
+            f"{calendar_metrics.actions_offered} action(s), "
+            f"{calendar_metrics.withheld_by_relevance} withheld by relevance, "
+            f"{calendar_metrics.travel_enriched} with travel, "
+            f"{calendar_metrics.venue_cache_hits} venue hit(s), "
+            f"{calendar_metrics.duration_seconds:.3f}s"
+        )
+        for action in digest.calendar_attachments:
+            print(
+                f"    {action.submission_id}: {action.title} — "
+                f"{action.when_line}"
+                + (f" — {action.travel_line}" if action.travel_line else "")
+            )
+    if digest.duplicate_titles_suppressed:
+        print(
+            f"  rendering: {digest.duplicate_titles_suppressed} duplicate "
+            f"title block(s) suppressed"
+        )
     if parking_metrics is not None and parking_metrics.mentions_detected:
         print(
             f"  parking: {parking_metrics.mentions_detected} mention(s), "
@@ -474,6 +532,41 @@ def _cmd_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _stored_calendar_judgements(connection, target_date: str) -> list[dict]:
+    """Replay a stored day's calendar relevance decisions for a preview.
+
+    A preview must never call the model, and re-scoring deterministically would
+    show something different from what was actually sent. So the recorded
+    judgement is reused verbatim when there is one.
+    """
+    from . import db
+
+    entries: list[dict] = []
+    try:
+        rows = db.calendar_recommendations(connection, target_date)
+    except Exception:  # noqa: BLE001 - an older date simply has no record
+        return entries
+    for row in rows:
+        if not row["is_event_candidate"] or row["relevance_score"] is None:
+            continue
+        if row["relevance_method"] != "claude":
+            continue
+        entries.append(
+            {
+                "submission_id": str(row["submission_id"]),
+                "calendar": {
+                    "offer": bool(row["offer_calendar"])
+                    or row["withheld_reason"] == "max_actions_reached",
+                    "confidence": float(row["relevance_score"]),
+                    "reason": row["relevance_reason"],
+                    "attendance_mode": row["attendance_mode"],
+                    "suggested_title": row["calendar_title"],
+                },
+            }
+        )
+    return entries
+
+
 def _cmd_send(args: argparse.Namespace) -> int:
     """Send a date that is already collected and stored."""
     from . import daily, settings as settings_module
@@ -483,7 +576,7 @@ def _cmd_send(args: argparse.Namespace) -> int:
     settings = settings_module.load()
     target = collect.parse_target_date(args.date)
 
-    from . import curate, db, mailer, parking_enrich, render
+    from . import calendar_enrich, curate, db, mailer, parking_enrich, render
 
     connection = _open_db()
     try:
@@ -515,9 +608,21 @@ def _cmd_send(args: argparse.Namespace) -> int:
             connection, rows, target_date=target, settings=settings,
             allow_refresh=False, allow_resolver=False,
         )
+        # Rebuild the calendar actions from stored state so a deliberate resend
+        # carries exactly what the original run decided, without a model call.
+        candidates, diagnostics = calendar_enrich.detect_candidates(
+            rows, target_date=target, settings=settings
+        )
+        calendar_actions, _ = calendar_enrich.enrich_digest(
+            connection, rows, target_date=target, settings=settings,
+            candidates=candidates, diagnostics=diagnostics,
+            curation_entries=_stored_calendar_judgements(connection, target),
+            curation_method=method, allow_routing=False,
+        )
         digest = render.render_digest(
             rows, target_date=target, counts=counts, ordering=ordering,
             curation_method=method, settings=settings, parking=parking_callouts,
+            calendar=calendar_actions,
         )
         daily._verify_digest(digest, rows)
 
@@ -534,6 +639,7 @@ def _cmd_send(args: argparse.Namespace) -> int:
             settings=settings, sender=mailer.sender_address(),
             subject=digest.subject, html=digest.html, text=digest.text,
             images=digest.images,
+            calendar_attachments=digest.calendar_attachments,
         )
         daily._verify_message(prepared, digest)
         status = mailer.send(prepared, settings)
@@ -556,7 +662,7 @@ def _cmd_send(args: argparse.Namespace) -> int:
     print(
         f"SEND OK date={target} to={settings.recipient} "
         f"size={prepared.size_bytes}B images={prepared.image_count} "
-        f"delivery={delivery_id}"
+        f"calendar={prepared.calendar_count} delivery={delivery_id}"
     )
     print(f"  subject: {prepared.subject}")
     print(f"  message-id: {prepared.message_id}")
@@ -619,6 +725,16 @@ def _cmd_status(args: argparse.Namespace) -> int:
         )
         if row["error_summary"]:
             print(f"        error: {row['error_summary'][:150]}")
+
+    print(
+        f"\ncalendar: {stats['calendar_actions_offered']} action(s) offered across "
+        f"{stats['calendar_recommendations']} evaluation(s), "
+        f"{stats['event_venues']} cached venue(s), "
+        f"{stats['repeat_matches']} logical repeat(s)"
+    )
+    for run in runs[:1]:
+        if run["calendar_stats"]:
+            print(f"  last run: {run['calendar_stats'][:200]}")
 
     print(
         f"\nparking cache: {stats['parking_locations']} location(s), "

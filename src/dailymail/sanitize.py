@@ -398,3 +398,161 @@ def sanitize_body(html: str, *, image_resolver=None) -> tuple[str, LinkStats, in
     prefiltered = prefilter(html)
     rewritten, stats, images = transform(prefiltered, image_resolver=image_resolver)
     return tighten(clean(rewritten)), stats, images
+
+
+# --- duplicate leading heading ------------------------------------------------
+#
+# Rowan bodies very often open by repeating their own subject as an <h2>. The
+# digest already renders that subject as the card's headline, so the reader sees
+# it twice. This removes the second one at RENDER TIME ONLY -- the stored source
+# in SQLite is never touched, and `sanitize_body` returns a derivative.
+#
+# The rule is deliberately narrow. A first block that merely *starts* with the
+# title and then says something is kept in full, as is anything carrying an
+# image, a link, or any text the headline does not already contain. Losing a
+# sentence would be a far worse defect than showing a title twice.
+
+_QUOTES = str.maketrans(
+    {"‘": "'", "’": "'", "“": '"', "”": '"',
+     "–": "-", "—": "-", " ": " "}
+)
+
+_HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6", "p", "div"}
+
+
+def normalize_visible_text(html_or_text: str) -> str:
+    """Fold visible text for the duplicate-title comparison.
+
+    Accounts for exactly what the requirement allows: whitespace, HTML entities,
+    curly versus straight quotes, case, and trivial trailing punctuation.
+    """
+    from html import unescape
+
+    text = re.sub(r"<[^>]+>", " ", html_or_text or "")
+    text = unescape(text).translate(_QUOTES)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = text.strip(" \t.:;,-–—!*")
+    return text.casefold()
+
+
+class _FirstBlock(HTMLParser):
+    """Locate the first element-level block and record what it contains."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.start: int | None = None
+        self.end: int | None = None
+        self.tag: str | None = None
+        self.depth = 0
+        self.has_image = False
+        self.has_link = False
+        self.done = False
+        self._leading_text: list[str] = []
+
+    def _offset(self) -> int:
+        line, column = self.getpos()
+        return self._line_starts[line - 1] + column
+
+    def feed(self, data: str) -> None:  # noqa: D102
+        self._data = data
+        self._line_starts = [0]
+        for index, char in enumerate(data):
+            if char == "\n":
+                self._line_starts.append(index + 1)
+        super().feed(data)
+
+    def handle_starttag(self, tag, attrs):
+        if self.done:
+            return
+        if self.start is None:
+            if tag in VOID_TAGS and tag not in _HEADING_TAGS:
+                # A leading <br> or <img> is not a heading block; stop looking.
+                self.done = True
+                return
+            if tag not in _HEADING_TAGS:
+                self.done = True
+                return
+            self.start = self._offset()
+            self.tag = tag
+            self.depth = 1
+            return
+        if tag == "img":
+            self.has_image = True
+        elif tag == "a":
+            self.has_link = True
+        if tag not in VOID_TAGS:
+            self.depth += 1
+
+    def handle_startendtag(self, tag, attrs):
+        if self.start is None:
+            self.done = True
+            return
+        if tag == "img":
+            self.has_image = True
+
+    def handle_endtag(self, tag):
+        if self.done or self.start is None:
+            return
+        self.depth -= 1
+        if self.depth == 0:
+            offset = self._offset()
+            closing = self._data.find(">", offset)
+            self.end = (closing + 1) if closing != -1 else len(self._data)
+            self.done = True
+
+    def handle_data(self, data):
+        if self.start is None and data.strip():
+            self.done = True  # bare text before any block: leave the body alone
+
+
+def suppress_duplicate_heading(html: str, subject: str) -> tuple[str, bool]:
+    """Drop a leading block that only repeats `subject`. Returns `(html, removed)`.
+
+    Operates on already-sanitized markup, so it can never reintroduce anything
+    unsafe, and it is a pure function of its inputs.
+    """
+    if not html or not subject:
+        return html or "", False
+    target = normalize_visible_text(subject)
+    if not target:
+        return html, False
+
+    parser = _FirstBlock()
+    try:
+        parser.feed(html)
+        parser.close()
+    except Exception:  # noqa: BLE001 - a malformed body simply keeps its heading
+        return html, False
+
+    if parser.start is None or parser.end is None:
+        return html, False
+    if parser.has_image or parser.has_link:
+        return html, False
+    if html[: parser.start].strip():
+        return html, False  # something meaningful precedes it
+
+    block = html[parser.start : parser.end]
+    if normalize_visible_text(block) != target:
+        return html, False
+
+    return html[: parser.start] + html[parser.end :], True
+
+
+def suppress_duplicate_text_heading(text: str, subject: str) -> tuple[str, bool]:
+    """The same rule for the plain-text alternative."""
+    if not text or not subject:
+        return text or "", False
+    target = normalize_visible_text(subject)
+    if not target:
+        return text, False
+    lines = text.split("\n")
+    for index, line in enumerate(lines):
+        if not line.strip():
+            continue
+        if normalize_visible_text(line) == target:
+            remaining = lines[index + 1 :]
+            while remaining and not remaining[0].strip():
+                remaining.pop(0)
+            return "\n".join(remaining), True
+        return text, False
+    return text, False
