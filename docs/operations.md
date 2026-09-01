@@ -91,8 +91,23 @@ uv run dailymail parking-refresh --campus glassboro
 uv run dailymail parking-set glassboro:lot:o-1 --description "..." \
     --latitude 39.712482 --longitude -75.120453  # pinned manual correction
 
+# logical repeat families and calendar sessions
+# (docs/logical-families-and-sessions.md)
+uv run dailymail families                        # every durable family
+uv run dailymail families --submission 6769      # one ID's family and evidence
+uv run dailymail families --recheck 2026-09-01   # re-resolve one date, read-only
+uv run dailymail families --recheck 2026-09-01 --apply    # persist + audit
+uv run dailymail sessions --date 2026-09-01      # detected calendar sittings
+uv run dailymail sessions --date 2026-09-01 --submission 6702 --ics
+
 # tests
-uv run pytest
+uv run pytest                                    # hermetic, no network
+DAILYMAIL_LIVE_PARKING=1 uv run pytest tests/test_parking_live.py
+DAILYMAIL_VISUAL_QA=1 uv run pytest tests/test_visual_qa.py
+
+# browser rendering QA (diagnostics only, never on the production path)
+uv run python tools/qa/build_page.py
+node tools/qa/visual-regression.mjs
 ```
 
 ### Logs and scheduling
@@ -237,7 +252,7 @@ dropping below the three most recent).
 
 ---
 
-## 4. Database schema (version 3)
+## 4. Database schema (version 4)
 
 Plain `sqlite3`: foreign keys on, WAL, 10 s busy timeout, explicit transactions.
 One integer version in `schema_meta`; no migration framework.
@@ -261,14 +276,29 @@ One integer version in `schema_meta`; no migration framework.
 | `parking_unresolved` | Candidates that could not be resolved, with attempt counts and reasons |
 | `event_venues` | One durable row per normalized venue: coordinate, provenance, travel mode, outbound/return minutes, routing source and fingerprint |
 | `calendar_recommendations` | One row per (date, announcement): candidate evidence, offer decision, relevance score/reason/method, attendance mode, title, event times, travel, mechanism, action URL, validation status, withheld reason |
-| `repeat_matches` | Which prior SubmissionId a repost was matched to, with method, confidence, similarity and evidence |
+| `repeat_matches` | Which prior SubmissionId a repost was matched to, with method, confidence, similarity, evidence and its durable family |
+| `logical_announcement_families` | One durable family per logical announcement: key, canonical SubmissionId, normalized title, category, audience, member count, confidence, method |
+| `logical_announcement_members` | Which SubmissionIds belong to a family, what each matched, and which one is canonical |
+| `display_status_corrections` | Append-only audit of retrospective changes to what the digest shows, and of a skipped repeat stage (`submission_id = 0`) |
 
 `runs.parking_stats` and `runs.calendar_stats` each hold one JSON object of
-per-run counters. `daily_records.display_status` holds what the digest shows;
+per-run counters. `calendar_recommendations.session_count` and `.sessions` record
+how many selectable sittings an announcement offered and what each one carries.
+`daily_records.display_status` holds what the digest shows;
 `daily_records.status` keeps Rowan's own classification and is never
 overwritten. Every upgrade is additive — `CREATE TABLE IF NOT EXISTS` plus
 guarded `ALTER TABLE ... ADD COLUMN` — transactional, idempotent, and it
 neither rewrites nor reads any existing announcement row.
+
+**Temp storage is pinned to memory** (`PRAGMA temp_store = MEMORY`) on every
+connection. This is not a performance tweak: SQLite's default writes a
+materialized sort or GROUP BY spill to a file in `$TMPDIR`, and on
+1 September 2026 the filesystem holding this host's `TMPDIR` was mounted
+read-only across the 06:30 run. The spill failed, `SQLITE_CANTOPEN` surfaced as
+"unable to open database file", and the entire logical-repeat stage was skipped
+for that day's digest. A working database plus an unwritable, unrelated temp
+directory must not be able to change what the reader is told.
+See `docs/logical-families-and-sessions.md` §1.
 
 ### Substantive change detection
 
@@ -561,6 +591,30 @@ uv run dailymail render --date 2026-08-21 --inline-images --out /tmp/preview
 `--inline-images` converts CID parts back to data URIs so the file opens in a
 browser.
 
+**An announcement was labelled NEW that the reader has already been sent.**
+```sh
+uv run dailymail status                          # look for a skipped stage
+uv run dailymail families --recheck <date>       # read-only: what would change
+uv run dailymail families --recheck <date> --apply
+```
+`status` prints `ATTENTION: the stage was skipped on N date(s)` when
+logical-repeat resolution failed for a day, with the exception text. `--recheck`
+re-resolves that date and `--apply` persists the corrections; neither touches
+Rowan's own `status`, rewrites run history, or resends anything.
+See `docs/logical-families-and-sessions.md` §1.
+
+**An announcement rendered in the wrong colour.**
+```sh
+uv run python tools/qa/build_page.py
+node tools/qa/visual-regression.mjs --full-page
+ls artifacts/qa/screenshots/
+```
+The browser QA suite measures the *computed* colour of body prose, headings and
+links at three viewports and under a dark-mode approximation, which is the class
+of defect a string assertion cannot see. To check a live date instead, render it
+and grep the derivative: every colour in the email should be one DailyMail chose,
+and no `rgb(...)` declaration should survive.
+
 ---
 
 ## 13. Known limitations
@@ -586,3 +640,17 @@ browser.
 * Images are re-encoded as JPEG flattened onto white. That suits the white email
   background and text-heavy flyers; a logo relying on transparency over a dark
   background would look different from the source.
+* Author-supplied text colours are dropped from announcement bodies at render
+  time. The stored source keeps them, and every other inline style the author
+  asked for survives — but a colour that is meaningful in the source is lost.
+  That is a deliberate trade: an announcement painted three points from the
+  design's own accent rendered as one long headline in Outlook mobile's dark
+  mode. See `docs/logical-families-and-sessions.md` §4.
+* Outlook mobile dark mode is *approximated* in browser QA by a uniform CSS
+  inversion, not reproduced. It reproduces the property that broke — body prose
+  and the headline must stay distinct colours — but is not Outlook's exact
+  transform, and no host here can run Outlook to check.
+* A durable repeat family's member list grows forward from the point detection
+  first matched two IDs. The canonical original is always a member, which is
+  what a future repost resolves against, but the list is not a complete history
+  of the announcement.

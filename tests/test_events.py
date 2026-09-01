@@ -8,7 +8,7 @@ the body, which is why detection cannot rely on that flag.
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, time, timedelta
 
 import pytest
 
@@ -82,8 +82,13 @@ def test_a_dated_deadline_is_not_a_calendar_event():
     assert diagnostics["reason"] in ("no_event_time", "deadline_not_event")
 
 
-def test_several_independent_dates_are_withheld_rather_than_guessed():
-    """Two coffee hours a fortnight apart are not one appointment."""
+def test_several_dated_sittings_become_several_sessions_not_one_appointment():
+    """Two coffee hours a fortnight apart are two choices, not one appointment.
+
+    This used to be withheld outright as `multiple_distinct_dates`. Refusing to
+    span the two dates as a single block was right; throwing the announcement
+    away was not, because the source pins each date to its own time range.
+    """
     body = (
         "Provost's Coffee Hours are small-group conversations.\n"
         "Our sessions are:\n"
@@ -93,8 +98,34 @@ def test_several_independent_dates_are_withheld_rather_than_guessed():
     row = make_town_hall_row(
         title="Provost's Coffee Hours", body_text=body, full_body=f"<p>{body}</p>"
     )
-    candidate, diagnostics = events.detect_candidate(row, reference_date=REFERENCE)
-    assert candidate is None
+    sessions, diagnostics = events.detect_series(row, reference_date=REFERENCE)
+    assert diagnostics.get("reason") is None
+    assert [(s.event_date.isoformat(), s.start.isoformat(), s.end.isoformat())
+            for s in sessions] == [
+        ("2026-09-10", "11:00:00", "12:30:00"),
+        ("2026-09-21", "14:30:00", "16:00:00"),
+    ]
+    # No session spans the gap between the two sittings.
+    assert all(s.end_datetime - s.start_datetime < timedelta(hours=3)
+               for s in sessions)
+
+
+def test_several_dates_with_no_time_of_their_own_are_still_withheld():
+    """The protection that mattered: ambiguity is still refused, not guessed at.
+
+    Three dates and one time range, none of them pinned to a date. There is no
+    honest way to say which sitting is which, so nothing is offered.
+    """
+    body = (
+        "Provost's Coffee Hours are small-group conversations.\n"
+        "We will meet on September 10, September 21 and October 2.\n"
+        "Sessions run 11:00-12:30.\n"
+    )
+    row = make_town_hall_row(
+        title="Provost's Coffee Hours", body_text=body, full_body=f"<p>{body}</p>"
+    )
+    sessions, diagnostics = events.detect_series(row, reference_date=REFERENCE)
+    assert sessions == []
     assert diagnostics["reason"] == "multiple_distinct_dates"
 
 

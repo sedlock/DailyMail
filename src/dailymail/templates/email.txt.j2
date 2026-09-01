@@ -38,17 +38,22 @@ PARKING LOCATION{{ 'S' if item.parking|length > 1 else '' }}
 
 CALENDAR
   {{ item.calendar.title }}
-  {{ item.calendar.when_line }}
 {% if item.calendar.location_line %}
   {{ item.calendar.location_line }}
 {% endif %}
-  Add to calendar: {{ item.calendar.action_url }}
-{% if item.calendar.travel_line %}
-  {{ item.calendar.travel_line }}
+{% if item.calendar.sessions_line %}
+  {{ item.calendar.sessions_line }}
 {% endif %}
-{% if item.calendar.attachment_line %}
-  {{ item.calendar.attachment_line }}
+{% for session in item.calendar.sessions %}
+  {{ session.when_line }}
+    {{ session.button_label }}: {{ session.action_url }}
+{% if session.travel_line %}
+    {{ session.travel_line }}
 {% endif %}
+{% if session.attachment_line %}
+    {{ session.attachment_line }}
+{% endif %}
+{% endfor %}
 {% endif %}
 
 {{ item.body_text }}
@@ -88,17 +93,22 @@ PARKING LOCATION{{ 'S' if item.parking|length > 1 else '' }}
 
 CALENDAR
   {{ item.calendar.title }}
-  {{ item.calendar.when_line }}
 {% if item.calendar.location_line %}
   {{ item.calendar.location_line }}
 {% endif %}
-  Add to calendar: {{ item.calendar.action_url }}
-{% if item.calendar.travel_line %}
-  {{ item.calendar.travel_line }}
+{% if item.calendar.sessions_line %}
+  {{ item.calendar.sessions_line }}
 {% endif %}
-{% if item.calendar.attachment_line %}
-  {{ item.calendar.attachment_line }}
+{% for session in item.calendar.sessions %}
+  {{ session.when_line }}
+    {{ session.button_label }}: {{ session.action_url }}
+{% if session.travel_line %}
+    {{ session.travel_line }}
 {% endif %}
+{% if session.attachment_line %}
+    {{ session.attachment_line }}
+{% endif %}
+{% endfor %}
 {% endif %}
 
 {{ item.body_text }}

@@ -26,6 +26,15 @@ TEMPLATE_DIR = str(Path(__file__).parent / "templates")
 
 AUDIENCE_LABELS = {"Employees": "EMPLOYEE", "Students": "STUDENT", "Both": "EVERYONE"}
 
+# The digest palette, in one place. `email.html.j2` declares the same values for
+# its own chrome; these are the ones imposed on *announcement body copy* so an
+# author's inline colour cannot repaint a card (see `sanitize.BodyColorPolicy`).
+BODY_INK = "#1a1a1a"
+BODY_ACCENT = "#57150B"
+BODY_COLOR_POLICY = sanitize.BodyColorPolicy(
+    body=BODY_INK, heading=BODY_ACCENT, link=BODY_ACCENT
+)
+
 
 @dataclass
 class RenderedDigest:
@@ -44,6 +53,7 @@ class RenderedDigest:
     parking_callouts: int = 0
     parking_unresolved: int = 0
     calendar_callouts: int = 0
+    calendar_session_actions: int = 0
     calendar_attachments: list = field(default_factory=list)
     duplicate_titles_suppressed: int = 0
 
@@ -124,6 +134,9 @@ def build_items(
         safe_html, link_stats, _seen = sanitize.sanitize_body(
             row["full_body"] or "",
             image_resolver=processor.resolver_for(submission_id, official_url),
+            # Render-time only. The stored `full_body` keeps every source colour
+            # byte for byte; the digest imposes its own inside the card.
+            color_policy=BODY_COLOR_POLICY,
         )
         total_normalized += len(link_stats.normalized)
         total_dropped += link_stats.dropped
@@ -382,11 +395,20 @@ def render_digest(
         calendar_callouts=sum(
             1 for sid in ordered_ids if items[sid].get("calendar") is not None
         ),
-        calendar_attachments=[
-            items[sid]["calendar"]
+        calendar_session_actions=sum(
+            items[sid]["calendar"].session_count
             for sid in ordered_ids
             if items[sid].get("calendar") is not None
-            and items[sid]["calendar"].ics_text
+        ),
+        # One attachment per offered *session*, in the order the reader sees the
+        # buttons, so a two-session announcement arrives with two unambiguously
+        # named files rather than one that answers for both.
+        calendar_attachments=[
+            session
+            for sid in ordered_ids
+            if items[sid].get("calendar") is not None
+            for session in items[sid]["calendar"].sessions
+            if session.ics_text
         ],
         duplicate_titles_suppressed=suppressed_titles,
     )

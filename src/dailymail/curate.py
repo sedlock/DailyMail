@@ -91,6 +91,12 @@ Some items carry an "event_candidate" block. That block was extracted
 deterministically from the announcement; its date, time and location are
 already established facts and are not yours to supply, change or check.
 
+An "event_candidate" may carry a "sessions" list. That means the announcement
+offers the reader a CHOICE of sittings of the same event, not several different
+events and not one long commitment. Judge the event once, for the series as a
+whole. Do not pick a session, do not rank them and do not comment on them; the
+caller offers a calendar control for every valid sitting from its own extraction.
+
 For those items only, add a "calendar" object judging whether an
 `Add to Calendar` button is worth showing. Judge RELEVANCE TO THIS READER, not
 whether the event exists.
@@ -270,7 +276,9 @@ def build_payload(
             "previous_deliveries": row["previous_deliveries"] or 0,
             "updated": bool(row["changed"]),
         }
-        candidate = (event_candidates or {}).get(str(row["submission_id"]))
+        entry = (event_candidates or {}).get(str(row["submission_id"]))
+        sessions = entry if isinstance(entry, list) else ([entry] if entry else [])
+        candidate = sessions[0] if sessions else None
         if candidate is not None:
             item["event_candidate"] = {
                 "title_hint": redact_emails(candidate.title)[:200],
@@ -285,6 +293,21 @@ def build_payload(
                 "heading_hint": redact_emails(candidate.heading_hint or "")[:120]
                 or None,
             }
+            if len(sessions) > 1:
+                # One judgement covers the whole series. The sittings are listed
+                # so the model can see it is a choice of dates rather than a
+                # multi-day commitment -- it is *not* asked to pick one, and the
+                # dates are read back from our own extraction either way.
+                item["event_candidate"]["sessions"] = [
+                    {
+                        "date": session.event_date.isoformat(),
+                        "start_time": session.start.strftime("%H:%M"),
+                        "end_time": (
+                            session.end.strftime("%H:%M") if session.end else None
+                        ),
+                    }
+                    for session in sessions
+                ]
         if row["is_event"]:
             item["event"] = {
                 "name": redact_emails(row["event_name"] or "") or None,

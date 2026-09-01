@@ -186,6 +186,43 @@ def _build_parser() -> argparse.ArgumentParser:
                              help="Release all pinned fields back to automated "
                                   "refresh.")
 
+    families_parser = subparsers.add_parser(
+        "families",
+        help="Logical repeat families: which SubmissionIds are one announcement.",
+    )
+    families_parser.add_argument(
+        "--submission", type=int,
+        help="Show the family one SubmissionId belongs to, and why it joined.",
+    )
+    families_parser.add_argument(
+        "--key", help="Show the family with this exact family_key.",
+    )
+    families_parser.add_argument(
+        "--recheck", metavar="YYYY-MM-DD",
+        help="Re-resolve one date's repeats read-only and print what would change.",
+    )
+    families_parser.add_argument(
+        "--apply", action="store_true",
+        help="With --recheck, persist the corrections and record why. Never "
+             "rewrites Rowan's own status and never resends a digest.",
+    )
+
+    sessions_parser = subparsers.add_parser(
+        "sessions",
+        help="Calendar sessions detected for a date, and what each one carries.",
+    )
+    sessions_parser.add_argument(
+        "--date", required=True, metavar="YYYY-MM-DD",
+        help="The digest date to inspect.",
+    )
+    sessions_parser.add_argument(
+        "--submission", type=int, help="Restrict to one announcement.",
+    )
+    sessions_parser.add_argument(
+        "--ics", action="store_true",
+        help="Print each session's complete .ics payload.",
+    )
+
     timer_parser = subparsers.add_parser(
         "install-timer", help="Install and enable the systemd user service and timer."
     )
@@ -507,12 +544,26 @@ def _cmd_render(args: argparse.Namespace) -> int:
             f"{calendar_metrics.venue_cache_hits} venue hit(s), "
             f"{calendar_metrics.duration_seconds:.3f}s"
         )
-        for action in digest.calendar_attachments:
+        if calendar_metrics.multi_session_announcements:
             print(
-                f"    {action.submission_id}: {action.title} — "
-                f"{action.when_line}"
-                + (f" — {action.travel_line}" if action.travel_line else "")
+                f"  sessions: {calendar_metrics.session_actions_offered} calendar "
+                f"control(s) across {calendar_metrics.actions_offered} "
+                f"announcement(s); "
+                f"{calendar_metrics.multi_session_announcements} offer more than one"
             )
+        for submission_id, action in sorted(calendar_actions.items()):
+            for session in action.sessions:
+                suffix = (
+                    f" [session {session.index}/{session.count}]"
+                    if session.count > 1
+                    else ""
+                )
+                print(
+                    f"    {submission_id}: {session.title}{suffix} — "
+                    f"{session.when_line}"
+                    + (f" — {session.travel_line}" if session.travel_line else "")
+                    + (f" — {session.ics_filename}" if session.ics_filename else "")
+                )
     if digest.duplicate_titles_suppressed:
         print(
             f"  rendering: {digest.duplicate_titles_suppressed} duplicate "
@@ -690,6 +741,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
             )
         )
         stats = db.statistics(connection)
+        corrections = db.display_status_corrections(connection)
     finally:
         connection.close()
 
@@ -729,12 +781,35 @@ def _cmd_status(args: argparse.Namespace) -> int:
     print(
         f"\ncalendar: {stats['calendar_actions_offered']} action(s) offered across "
         f"{stats['calendar_recommendations']} evaluation(s), "
-        f"{stats['event_venues']} cached venue(s), "
-        f"{stats['repeat_matches']} logical repeat(s)"
+        f"{stats['event_venues']} cached venue(s)"
     )
     for run in runs[:1]:
         if run["calendar_stats"]:
             print(f"  last run: {run['calendar_stats'][:200]}")
+
+    print(
+        f"\nlogical repeats: {stats['repeat_matches']} match(es) across "
+        f"{stats['logical_families']} durable famil"
+        f"{'y' if stats['logical_families'] == 1 else 'ies'} "
+        f"({stats['logical_family_members']} member(s))"
+    )
+    skipped = [row for row in corrections if row["submission_id"] == 0]
+    if skipped:
+        # A skipped stage means a digest went out with Rowan's own labels
+        # instead of the reader's. It is not an alert condition, but it must not
+        # be invisible either -- on 2026-09-01 a journal WARNING was the only
+        # trace, and the mislabelled digest had already been sent.
+        print(f"  ATTENTION: the stage was skipped on {len(skipped)} date(s):")
+        for row in skipped[-5:]:
+            print(f"    {row['target_date']}  {row['reason'][:120]}")
+        print("    re-resolve with: dailymail families --recheck <date> --apply")
+    applied = [row for row in corrections if row["submission_id"] != 0]
+    if applied:
+        dates = sorted({row["target_date"] for row in applied})
+        print(
+            f"  {len(applied)} display-status correction(s) recorded on "
+            f"{len(dates)} date(s): {', '.join(dates[-5:])}"
+        )
 
     print(
         f"\nparking cache: {stats['parking_locations']} location(s), "
@@ -1213,6 +1288,295 @@ def _cmd_parking_set(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_family(connection, family) -> None:
+    from . import db
+
+    print(f"family {family['family_id']}  {family['family_key']}")
+    print(
+        f"  canonical: {family['canonical_submission_id']}   "
+        f"members: {family['member_count']}   "
+        f"method: {family['match_method']}   "
+        f"confidence: {family['confidence']}"
+    )
+    print(f"  created: {family['created_at']}   last seen: {family['last_seen_at']}")
+    for member in db.family_members(connection, family["family_id"]):
+        marker = "*" if member["is_canonical"] else " "
+        matched = member["matched_submission_id"]
+        print(
+            f"  {marker} {member['submission_id']}  "
+            f"first seen {member['first_seen'][:10]}  "
+            + (f"matched {matched}  " if matched else "anchor       ")
+            + f"{member['match_method'] or ''}"
+        )
+        dates = db.dates_with_record(connection, member["submission_id"])
+        shown = ", ".join(
+            f"{row['target_date']}={row['display_status'] or row['status']}"
+            for row in dates
+        )
+        if shown:
+            print(f"      appeared: {shown}")
+
+
+def _cmd_families(args: argparse.Namespace) -> int:
+    """Inspect the durable logical families, and re-check one date's decisions."""
+    from . import daily, db
+
+    if args.recheck:
+        return _recheck_repeats(args)
+
+    connection = db.connect_readonly()
+    try:
+        if args.submission is not None:
+            family = db.family_for_submission(connection, args.submission)
+            if family is None:
+                print(
+                    f"submission {args.submission} belongs to no logical family"
+                )
+                match = db.repeat_match(connection, args.submission)
+                if match is not None:
+                    print(
+                        f"  but it does have a repeat match: repeats "
+                        f"{match['matched_submission_id']} "
+                        f"({match['method']}, confidence {match['confidence']})"
+                    )
+                return 0
+            _print_family(connection, family)
+            match = db.repeat_match(connection, args.submission)
+            if match is not None:
+                print("  repeat-match evidence:")
+                for key, value in sorted(json.loads(match["evidence"] or "{}").items()):
+                    print(f"    {key}: {value}")
+            return 0
+
+        if args.key:
+            family = db.family_by_key(connection, args.key)
+            if family is None:
+                print(f"no family with key {args.key!r}")
+                return 1
+            _print_family(connection, family)
+            return 0
+
+        rows = list(
+            connection.execute(
+                "SELECT * FROM logical_announcement_families "
+                "ORDER BY member_count DESC, family_id"
+            )
+        )
+        if not rows:
+            print("no logical families recorded yet")
+            return 0
+        print(f"{len(rows)} logical famil{'y' if len(rows) == 1 else 'ies'}\n")
+        for family in rows:
+            _print_family(connection, family)
+            print()
+        return 0
+    finally:
+        connection.close()
+
+
+def _recheck_repeats(args: argparse.Namespace) -> int:
+    """Re-resolve one past date's repeat classification. Read-only by default.
+
+    This is the operator path for a day the stage was skipped -- as happened on
+    2026-09-01, when SQLite could not create a temp file. It never touches
+    `daily_records.status`, never rewrites run history, and never resends
+    anything: it corrects what future renderings of that date will show, and
+    records why in `display_status_corrections`.
+    """
+    from . import daily, db
+
+    target = args.recheck
+    connection = db.connect() if args.apply else db.connect_readonly()
+    try:
+        rows = db.digest_rows(connection, target)
+        if not rows:
+            raise UsageError(f"no stored records for {target}")
+        before = {
+            int(row["submission_id"]): row["display_status"] for row in rows
+        }
+        matches = daily.resolve_logical_repeats(connection, rows, target)
+        changes = [
+            (submission_id, match)
+            for submission_id, match in sorted(
+                matches.items(), key=lambda item: int(item[0])
+            )
+            if before.get(int(submission_id)) != match.display_status
+        ]
+        print(
+            f"RECHECK {target}: {len(rows)} announcement(s), "
+            f"{len(matches)} logical repeat(s), {len(changes)} change(s)"
+        )
+        titles = {str(row["submission_id"]): row["title"] for row in rows}
+        for submission_id, match in sorted(
+            matches.items(), key=lambda item: int(item[0])
+        ):
+            was = before.get(int(submission_id)) or "New (Rowan)"
+            arrow = "->" if was != match.display_status else "=="
+            print(
+                f"  {submission_id} {was} {arrow} {match.display_status}"
+                f"{' + UPDATED' if match.materially_changed else ''}"
+            )
+            print(
+                f"      repeats {match.matched_submission_id} "
+                f"({match.method}, similarity {match.body_similarity:.4f}, "
+                f"via {match.evidence.get('candidate_source')}, "
+                f"delivered {match.evidence.get('prior_delivered')})"
+            )
+            print(f"      {titles.get(submission_id, '')[:88]}")
+
+        if not args.apply:
+            print("\nread-only: pass --apply to persist these corrections")
+            return 0
+
+        reason = (
+            f"dailymail families --recheck {target} --apply: re-resolved under "
+            f"the durable logical-family model"
+        )
+        written = daily.persist_logical_repeats(connection, matches, target)
+        with db.transaction(connection):
+            for submission_id, match in changes:
+                db.record_display_status_correction(
+                    connection,
+                    target_date=target,
+                    submission_id=int(submission_id),
+                    previous_display_status=before.get(int(submission_id)),
+                    new_display_status=match.display_status,
+                    reason=reason,
+                )
+        print(
+            f"\napplied: {written} display status(es) written, "
+            f"{len(changes)} correction(s) recorded"
+        )
+        print("Rowan's own status and the run history are unchanged.")
+        print("No digest was resent; this affects future rendering and history.")
+        return 0
+    finally:
+        connection.close()
+
+
+def _cmd_sessions(args: argparse.Namespace) -> int:
+    """What the calendar path detected for a date, session by session."""
+    from datetime import date as _date
+
+    from . import calendar_enrich, db, events, settings as settings_module
+
+    settings = settings_module.load()
+    connection = db.connect_readonly()
+    try:
+        rows = db.digest_rows(connection, args.date)
+        if not rows:
+            raise UsageError(f"no stored records for {args.date}")
+        if args.submission is not None:
+            rows = [
+                row for row in rows
+                if int(row["submission_id"]) == args.submission
+            ]
+            if not rows:
+                raise UsageError(
+                    f"submission {args.submission} has no record for {args.date}"
+                )
+        reference = _date.fromisoformat(args.date)
+        offered = withheld = 0
+        for row in rows:
+            sessions, diagnostics = events.detect_series(
+                row, reference_date=reference
+            )
+            if not sessions:
+                withheld += 1
+                if args.submission is not None:
+                    print(
+                        f"{row['submission_id']}: no calendar session "
+                        f"({diagnostics.get('reason')})"
+                    )
+                    print(f"  evidence: {diagnostics.get('evidence')}")
+                continue
+            offered += 1
+            print(f"{row['submission_id']}: {row['title'][:78]}")
+            print(
+                f"  {len(sessions)} session(s)   "
+                f"evidence: {', '.join(sessions[0].evidence)}"
+            )
+            for session in sessions:
+                end = session.end.isoformat() if session.end else "(assumed +1h)"
+                print(
+                    f"    #{session.session_index}/{session.session_count} "
+                    f"{session.event_date.isoformat()} "
+                    f"{session.start.isoformat()}-{end}   "
+                    f"mode={session.attendance_mode} "
+                    f"location={session.location or '-'}"
+                )
+            # Series-level, so read it from the series rather than whichever
+            # sitting the loop above happened to finish on.
+            if sessions[0].registration_urls:
+                print(f"    registration: {sessions[0].registration_urls[0]}")
+            print()
+
+        stored = {
+            record["submission_id"]: record
+            for record in db.calendar_recommendations(connection, args.date)
+        }
+        if args.submission is None:
+            print(
+                f"{offered} announcement(s) with sessions, {withheld} without, "
+                f"from {len(rows)} record(s) on {args.date}"
+            )
+        for record in stored.values():
+            if not record["offer_calendar"]:
+                continue
+            if args.submission is not None and (
+                record["submission_id"] != args.submission
+            ):
+                continue
+            print(
+                f"offered {record['submission_id']}: "
+                f"{record['calendar_title']}  "
+                f"sessions={record['session_count']}  "
+                f"mechanism={record['mechanism']}"
+            )
+            for entry in json.loads(record["sessions"] or "[]"):
+                print(
+                    f"    #{entry['index']} {entry['start']} -> {entry['end']}  "
+                    f"{entry['ics_filename']}  travel="
+                    f"{entry['travel_minutes_before']}/"
+                    f"{entry['travel_minutes_after']}"
+                )
+
+        if args.ics:
+            _print_session_ics(connection, args, settings, rows)
+        return 0
+    finally:
+        connection.close()
+
+
+def _print_session_ics(connection, args, settings, rows) -> None:
+    """Rebuild and print the calendar payloads, without writing anything."""
+    from . import calendar_enrich
+
+    candidates, diagnostics = calendar_enrich.detect_candidates(
+        rows, target_date=args.date, settings=settings
+    )
+    actions, _metrics = calendar_enrich.enrich_digest(
+        connection, rows, target_date=args.date, settings=settings,
+        candidates=candidates, diagnostics=diagnostics,
+        curation_entries=[
+            {
+                "submission_id": str(row["submission_id"]),
+                "calendar": {
+                    "offer": True, "confidence": 1.0,
+                    "reason": "cli --ics inspection",
+                },
+            }
+            for row in rows
+        ],
+        curation_method="claude",
+        allow_routing=False,
+    )
+    for submission_id, action in sorted(actions.items()):
+        for session in action.sessions:
+            print(f"\n--- {submission_id} {session.ics_filename} ---")
+            print(session.ics_text)
+
+
 def _valid_campus(value: str | None) -> str | None:
     from . import parking
 
@@ -1249,6 +1613,10 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_db_status(args)
         if args.command == "db-init":
             return _cmd_db_init(args)
+        if args.command == "families":
+            return _cmd_families(args)
+        if args.command == "sessions":
+            return _cmd_sessions(args)
         if args.command == "install-timer":
             return _cmd_install_timer(args)
         if args.command == "parking-status":

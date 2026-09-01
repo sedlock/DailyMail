@@ -16,9 +16,17 @@ feature: the model cannot manufacture an appointment because it is never on the
 path that produces one.
 
 Validation is strict on purpose. A stated weekday must agree with the stated
-date, a start must precede its end, and an announcement advertising several
-independent occurrences is *not* one calendar event -- it is withheld rather
-than guessed at.
+date, a start must precede its end, and an announcement whose dates cannot be
+resolved into definite sittings is withheld rather than guessed at.
+
+**One announcement, several sittings.** Rowan's Provost's Coffee Hours offers a
+choice: "Thursday, September 10 from 11:00-12:30" or "Monday, September 21 from
+2:30-4:00". That used to be withheld outright as `multiple_distinct_dates`,
+which was right to refuse to guess and wrong to throw the announcement away --
+so `parse_sessions` now recognizes a session list where, and only where, the
+source itself pins each date to its own time range. Each sitting becomes its own
+`EventCandidate` sharing the series' location, links and audience, and therefore
+its own calendar action. Anything less definite is still withheld.
 """
 
 from __future__ import annotations
@@ -187,6 +195,27 @@ class EventCandidate:
     audience: str | None = None
     speaker: str | None = None
     heading_hint: str | None = None
+    # --- multi-session announcements -------------------------------------
+    # One announcement can advertise several *selectable* sittings of the same
+    # event: "Thursday, September 10 from 11:00-12:30" and "Monday, September 21
+    # from 2:30-4:00" are one Coffee Hours series the reader picks one of, not
+    # one three-week appointment and not two unrelated events. Each session is
+    # its own EventCandidate carrying identical series metadata, so everything
+    # downstream -- travel, description, .ics -- works per session without a
+    # second code path.
+    session_index: int = 1
+    session_count: int = 1
+    # Every session the announcement offers, this one included, in date order.
+    sibling_sessions: list[tuple] = field(default_factory=list)
+
+    @property
+    def is_session_of_series(self) -> bool:
+        return self.session_count > 1
+
+    @property
+    def session_label(self) -> str:
+        """`Thu, Sep 10` -- short enough for a button on a phone."""
+        return self.event_date.strftime("%a, %b %-d")
 
     @property
     def start_datetime(self) -> datetime:
@@ -217,6 +246,8 @@ class EventCandidate:
             "segments": [segment.as_dict() for segment in self.segments],
             "heading_hint": self.heading_hint,
             "evidence": list(self.evidence),
+            "session_index": self.session_index,
+            "session_count": self.session_count,
         }
 
 
@@ -298,6 +329,211 @@ def parse_dates(text: str, *, reference: date) -> list[tuple[date, bool]]:
         found.setdefault(parsed, False)
 
     return sorted(found.items())
+
+
+# --- multi-session extraction ------------------------------------------------
+#
+# The previous implementation withheld any announcement whose body named more
+# than one date (`multiple_distinct_dates`). That was right about the danger --
+# picking one of several dates, or spanning them all as one appointment, would
+# both be wrong -- and wrong about the remedy for a real and common shape:
+#
+#     Our August sessions will be focused on research. The dates are:
+#     Thursday, September 10 from 11:00-12:30
+#     Monday, September 21 from 2:30-4:00
+#
+#     ... register your interest ... by Monday, September 7th. These sessions
+#     are limited to 10-12 people ...
+#
+# Three dates and two time ranges, and Rowan's Provost's Coffee Hours is a real
+# announcement offering the reader a *choice of sitting*. So a session is
+# recognized only where the source itself pins one date to one time range
+# tightly enough that no inference is needed:
+#
+#   * exactly one date and exactly one time range on the line,
+#   * separated by at most `MAX_SESSION_GAP_CHARS` of connective text,
+#   * with no sentence break and no other number between them,
+#   * on a line short enough to be a schedule entry rather than prose,
+#   * and not phrased as a recurrence.
+#
+# The paragraph above fails on three of those at once: the gap from "September
+# 7th" to "10-12" crosses a full stop, carries 31 characters, and sits on a
+# 300-character line. `10-12 people` therefore never becomes an appointment.
+
+# Sessions beyond this are a timetable, not a choice the reader makes; the
+# announcement is withheld rather than turned into a wall of buttons.
+MAX_SESSIONS = 6
+# "Thursday, September 10 from 11:00-12:30" -> " from ". Generous enough for
+# "at", "from", ", ", "-", " | ", and no more.
+MAX_SESSION_GAP_CHARS = 24
+# A session line states a schedule. Prose that happens to contain a date and a
+# quantity range is longer than this.
+MAX_SESSION_LINE_CHARS = 160
+_SENTENCE_BREAK = re.compile(r"[.;!?]")
+
+
+@dataclass
+class SessionSpec:
+    """One selectable sitting the source pinned to a date and a time range."""
+
+    event_date: date
+    start: time
+    end: time | None
+    weekday_confirmed: bool = False
+    line: str = ""
+
+    @property
+    def key(self) -> tuple:
+        return (self.event_date, self.start, self.end)
+
+
+def _dates_with_spans(folded_line: str, *, reference: date) -> list[tuple]:
+    """`(date, weekday_confirmed, start_offset, end_offset)` for one folded line.
+
+    Deliberately a separate pass from `parse_dates`: session extraction needs to
+    know *where* the date sits so adjacency to a time range can be judged, and
+    `parse_dates` only needs the set of dates.
+    """
+    found: list[tuple] = []
+    for match in _LONG_DATE.finditer(folded_line):
+        month = MONTHS.get(match.group("month").lower().rstrip("."))
+        if month is None:
+            continue
+        try:
+            day = int(match.group("day"))
+        except (TypeError, ValueError):
+            continue
+        year_text = match.group("year")
+        year = int(year_text) if year_text else _year_for(
+            month, day, reference=reference
+        )
+        try:
+            parsed = date(year, month, day)
+        except ValueError:
+            continue
+        weekday_text = match.group("weekday")
+        confirmed = False
+        if weekday_text is not None:
+            expected = WEEKDAYS.get(weekday_text.lower().rstrip("."))
+            if expected is not None and expected != parsed.weekday():
+                continue  # contradictory: refuse it outright, exactly as before
+            confirmed = True
+        found.append((parsed, confirmed, match.start(), match.end()))
+
+    for match in _NUMERIC_DATE.finditer(folded_line):
+        month, day = int(match.group("month")), int(match.group("day"))
+        if not (1 <= month <= 12 and 1 <= day <= 31):
+            continue
+        year_text = match.group("year")
+        if year_text:
+            year = int(year_text)
+            if year < 100:
+                year += 2000
+        else:
+            year = _year_for(month, day, reference=reference)
+        try:
+            parsed = date(year, month, day)
+        except ValueError:
+            continue
+        if any(
+            start <= match.start() < end for _d, _c, start, end in found
+        ):
+            continue  # already covered by a long-date match
+        found.append((parsed, False, match.start(), match.end()))
+    return sorted(found, key=lambda entry: entry[2])
+
+
+def _ranges_with_spans(folded_line: str) -> list[tuple]:
+    """`(TimeSegment, start_offset, end_offset)` for one folded line."""
+    out: list[tuple] = []
+    for match in _TIME_RANGE.finditer(folded_line):
+        start_meridiem = _meridiem(match.group("sp"))
+        end_meridiem = _meridiem(match.group("ep"))
+        if start_meridiem is None and end_meridiem is not None:
+            start_meridiem = end_meridiem
+        start_hour = _resolve_hour(int(match.group("s")), start_meridiem)
+        end_hour = _resolve_hour(int(match.group("e")), end_meridiem)
+        if start_hour is None or end_hour is None:
+            continue
+        start_minute = int(match.group("sm") or 0)
+        end_minute = int(match.group("em") or 0)
+        if start_minute > 59 or end_minute > 59:
+            continue
+        try:
+            start = time(start_hour, start_minute)
+            end = time(end_hour, end_minute)
+        except ValueError:
+            continue
+        if end <= start:
+            if end_meridiem is None and end_hour + 12 <= 23:
+                end = time(end_hour + 12, end_minute)
+            if end <= start:
+                continue
+        out.append((TimeSegment(start=start, end=end), match.start(), match.end()))
+    return out
+
+
+def _adjacent(folded_line: str, date_span: tuple, range_span: tuple) -> bool:
+    """Is the time range close enough to the date to be the same statement?
+
+    The connective text between them must be short, free of sentence breaks and
+    free of other digits. That last condition is what stops "September 7th. These
+    sessions are limited to 10-12 people" reading as a 10:00-12:00 sitting.
+    """
+    date_start, date_end = date_span
+    range_start, range_end = range_span
+    if range_start >= date_end:
+        between = folded_line[date_end:range_start]
+    elif date_start >= range_end:
+        between = folded_line[range_end:date_start]
+    else:
+        return False  # overlapping matches are not two facts
+    if len(between) > MAX_SESSION_GAP_CHARS:
+        return False
+    if _SENTENCE_BREAK.search(between):
+        return False
+    return not any(char.isdigit() for char in between)
+
+
+def parse_sessions(text: str, *, reference: date) -> list[SessionSpec]:
+    """Every selectable sitting the source states unambiguously, in date order.
+
+    Returns `[]` when the text does not describe a session list -- which is the
+    normal case, and which leaves the single-event path completely unchanged.
+    """
+    sessions: dict[tuple, SessionSpec] = {}
+    for raw_line in (text or "").splitlines():
+        line = " ".join(raw_line.split())
+        if not line or len(line) > MAX_SESSION_LINE_CHARS:
+            continue
+        folded = _fold(line)
+        if looks_recurring(folded):
+            continue
+        dates = _dates_with_spans(folded, reference=reference)
+        ranges = _ranges_with_spans(folded)
+        if len(dates) != 1 or len(ranges) != 1:
+            continue
+        parsed, confirmed, date_start, date_end = dates[0]
+        segment, range_start, range_end = ranges[0]
+        if not _adjacent(folded, (date_start, date_end), (range_start, range_end)):
+            continue
+        spec = SessionSpec(
+            event_date=parsed, start=segment.start, end=segment.end,
+            weekday_confirmed=confirmed, line=line,
+        )
+        # A repeated statement of the same sitting is one sitting.
+        sessions.setdefault(spec.key, spec)
+    ordered = sorted(sessions.values(), key=lambda spec: (spec.event_date, spec.start))
+    return ordered
+
+
+def sessions_are_distinct_occasions(sessions: list[SessionSpec]) -> bool:
+    """True when the sittings are genuinely separate choices, not one event.
+
+    Two ranges on the *same* day are the phases of one event -- that is what
+    `merge_segments` is for -- so they are not a session list.
+    """
+    return len({spec.event_date for spec in sessions}) == len(sessions) >= 2
 
 
 def _meridiem(raw: str | None) -> str | None:
@@ -605,8 +841,48 @@ _REGISTRATION_HINTS = (
 )
 
 
+# How much of the sentence *before* a link may be read as saying what the link
+# is for. Rowan authors routinely put the verb in the prose and the bare host in
+# the anchor -- "we invite you to register your interest by completing this form
+# (go.rowan.edu/CoffeeSept26)" -- so anchor text alone misses a real
+# registration link.
+#
+# Scoped to the anchor's own block, and to a narrower hint set than the anchor
+# uses, because prose is looser evidence than a link label. The scoping is what
+# keeps it honest: the Provost's Town Hall body says "WebEx (Register for the
+# link)" in one list item and links an unrelated feedback form two paragraphs
+# later, and a flat character window would wrongly call that second link a
+# registration URL.
+_REGISTRATION_CONTEXT_CHARS = 200
+_REGISTRATION_CONTEXT_HINTS = (
+    "register", "registration", "rsvp", "sign up", "signup", "enroll",
+    "this form", "reserve your", "reserve a",
+)
+# Where the anchor's own block begins. Any of these ends the preceding context.
+_BLOCK_BOUNDARY = re.compile(
+    r"<\s*/?\s*(?:p|div|li|ul|ol|td|th|tr|table|h[1-6]|br|blockquote|dd|dt|dl"
+    r"|figure|figcaption|pre|caption)\b[^>]*>",
+    re.IGNORECASE,
+)
+
+
+def _preceding_block_text(html: str, offset: int) -> str:
+    """The visible text between the anchor and the start of its own block."""
+    boundaries = list(_BLOCK_BOUNDARY.finditer(html, 0, offset))
+    start = boundaries[-1].end() if boundaries else 0
+    fragment = html[start:offset]
+    return _fold(unescape(re.sub(r"<[^>]+>", " ", fragment)))[
+        -_REGISTRATION_CONTEXT_CHARS:
+    ]
+
+
 def registration_urls(html: str | None) -> list[str]:
-    """Links whose own anchor text or URL says they are for registering."""
+    """Links the source itself says are for registering.
+
+    Evidence is the anchor text, the URL, or the prose immediately preceding the
+    link. Nothing is synthesized: a registration URL that is not in the source
+    does not exist.
+    """
     if not html:
         return []
     found: list[str] = []
@@ -619,9 +895,14 @@ def registration_urls(html: str | None) -> list[str]:
             continue
         anchor = _fold(unescape(re.sub(r"<[^>]+>", " ", match.group(2))))
         haystack = f"{anchor} {_fold(href)}"
-        if any(hint in haystack for hint in _REGISTRATION_HINTS):
-            if href not in found:
-                found.append(href)
+        matched = any(hint in haystack for hint in _REGISTRATION_HINTS)
+        if not matched:
+            preceding = _preceding_block_text(html, match.start())
+            matched = any(
+                hint in preceding for hint in _REGISTRATION_CONTEXT_HINTS
+            )
+        if matched and href not in found:
+            found.append(href)
     return found
 
 
@@ -654,9 +935,23 @@ def first_heading(html: str | None) -> str | None:
 def detect_candidate(row, *, reference_date: date) -> tuple[EventCandidate | None, dict]:
     """Decide whether one stored announcement is a schedulable event.
 
-    Returns `(candidate_or_None, diagnostics)`. Diagnostics always explain the
-    decision so `calendar_recommendations` can record *why* nothing was offered,
-    which is what makes the threshold tunable later without guesswork.
+    Returns `(candidate_or_None, diagnostics)` where the candidate is the first
+    session. Kept as the single-event view of `detect_series` because most
+    announcements have exactly one sitting and most callers want exactly one.
+    """
+    sessions, diagnostics = detect_series(row, reference_date=reference_date)
+    return (sessions[0] if sessions else None), diagnostics
+
+
+def detect_series(row, *, reference_date: date) -> tuple[list[EventCandidate], dict]:
+    """Every selectable session one stored announcement describes.
+
+    Returns `(sessions, diagnostics)` -- an empty list when the announcement is
+    not a schedulable event, one entry for an ordinary event, and one entry per
+    advertised sitting for something like the Provost's Coffee Hours.
+    Diagnostics always explain the decision so `calendar_recommendations` can
+    record *why* nothing was offered, which is what makes the threshold tunable
+    later without guesswork.
     """
     submission_id = str(_row_value(row, "submission_id", ""))
     title = " ".join(str(_row_value(row, "title", "") or "").split())
@@ -709,16 +1004,37 @@ def detect_candidate(row, *, reference_date: date) -> tuple[EventCandidate | Non
         reference=reference_date,
     )
 
+    schedule_pool_text = "\n".join(
+        filter(None, [fields.get("date"), fields.get("dates"), fields.get("when"),
+                      title, body_text])
+    )
+    session_specs: list[SessionSpec] = []
+
     if event_date is None:
         pool = labelled_dates or body_dates
-        # An announcement advertising several independent occurrences (two
-        # coffee hours a fortnight apart) is not one appointment. Withhold
-        # rather than silently pick one.
         distinct = {value for value, _ in pool}
         if len(distinct) > 1:
-            diagnostics["reason"] = "multiple_distinct_dates"
-            return None, diagnostics
-        if pool:
+            # Several dates. Either the announcement offers the reader a choice
+            # of sitting -- in which case the source pins each date to its own
+            # time range and each becomes its own calendar action -- or it is
+            # ambiguous, and ambiguous still means withheld.
+            session_specs = parse_sessions(
+                schedule_pool_text, reference=reference_date
+            )
+            if not sessions_are_distinct_occasions(session_specs):
+                diagnostics["reason"] = "multiple_distinct_dates"
+                diagnostics["sessions_found"] = len(session_specs)
+                return [], diagnostics
+            if len(session_specs) > MAX_SESSIONS:
+                diagnostics["reason"] = "too_many_sessions"
+                diagnostics["sessions_found"] = len(session_specs)
+                return [], diagnostics
+            event_date = session_specs[0].event_date
+            evidence.append("multi_session_schedule")
+            evidence.append(
+                "body_date_labelled" if labelled_dates else "body_date"
+            )
+        elif pool:
             event_date = pool[0][0]
             evidence.append(
                 "body_date_labelled" if labelled_dates else "body_date"
@@ -731,7 +1047,7 @@ def detect_candidate(row, *, reference_date: date) -> tuple[EventCandidate | Non
 
     if event_date is None:
         diagnostics["reason"] = "no_event_date"
-        return None, diagnostics
+        return [], diagnostics
 
     if any(stated for value, stated in body_dates if value == event_date):
         evidence.append("weekday_confirmed")
@@ -750,7 +1066,14 @@ def detect_candidate(row, *, reference_date: date) -> tuple[EventCandidate | Non
 
     start: time | None = source_start
     end: time | None = source_end
-    if start is not None:
+    if session_specs:
+        # Each sitting carries its own times; merging across them would invent
+        # an appointment spanning weeks. The series-level start/end below is
+        # simply the first session's, so every existing gate reads sensibly.
+        evidence.append("session_time_ranges")
+        segments = []
+        start, end = session_specs[0].start, session_specs[0].end
+    elif start is not None:
         evidence.append("source_time_block")
         if segments:
             merged_start, merged_end = merge_segments(segments)
@@ -767,24 +1090,27 @@ def detect_candidate(row, *, reference_date: date) -> tuple[EventCandidate | Non
 
     if start is None:
         diagnostics["reason"] = "no_event_time"
-        return None, diagnostics
+        return [], diagnostics
 
     if end is not None and end <= start:
         diagnostics["reason"] = "end_before_start"
-        return None, diagnostics
+        return [], diagnostics
 
     # A repeating timetable is not an appointment. Rowan's own structured event
     # fields override this: if it filled in a specific date and start time, it
-    # has already told us which occurrence it means.
-    if source_start is None and looks_recurring(
+    # has already told us which occurrence it means. An enumerated session list
+    # is judged line by line inside `parse_sessions`, which rejects "Mondays,
+    # 2:30-4:00" while accepting "Monday, September 21 from 2:30-4:00" -- the
+    # whole-body check would trip over unrelated prose elsewhere.
+    if source_start is None and not session_specs and looks_recurring(
         schedule_text or body_text
     ):
         diagnostics["reason"] = "recurring_schedule"
-        return None, diagnostics
+        return [], diagnostics
 
     if len(segments) > 1 and not segments_are_sequential(segments):
         diagnostics["reason"] = "overlapping_time_blocks"
-        return None, diagnostics
+        return [], diagnostics
 
     # --- is this actually an event, or just a dated deadline? ---------------
     is_deadline = any(phrase in folded for phrase in DEADLINE_LANGUAGE)
@@ -794,35 +1120,62 @@ def detect_candidate(row, *, reference_date: date) -> tuple[EventCandidate | Non
     } & set(evidence)
     if not strong:
         diagnostics["reason"] = "no_event_evidence"
-        return None, diagnostics
+        return [], diagnostics
     if is_deadline and not ({"source_event_flag", "labelled_time_range",
                              "labelled_body_schedule"} & set(evidence)):
         diagnostics["reason"] = "deadline_not_event"
-        return None, diagnostics
+        return [], diagnostics
 
     mode, physical, virtual = detect_attendance(searchable, source_location)
     if fields.get("location") and _fold(fields["location"]).startswith("hybrid"):
         mode = "hybrid"
 
-    candidate = EventCandidate(
+    # Series-level metadata, identical for every session: the location, the
+    # registration link, the audience and the attendance mode belong to the
+    # announcement, not to one sitting of it.
+    shared = dict(
         submission_id=submission_id,
         title=" ".join(str(source_name or title).split()) or title,
-        event_date=event_date,
-        start=start,
-        end=end,
         location=physical,
         location_detail=fields.get("location") or (source_location or None),
         virtual_detail=virtual,
         attendance_mode=mode,
-        segments=segments,
         registration_urls=registration_urls(full_body),
         source_urls=extract_urls(full_body),
         evidence=sorted(set(evidence)),
         audience=fields.get("who") or fields.get("audience"),
         heading_hint=first_heading(full_body),
     )
-    diagnostics["candidate"] = candidate.as_dict()
-    return candidate, diagnostics
+
+    if session_specs:
+        windows = [
+            (spec.event_date, spec.start, spec.end) for spec in session_specs
+        ]
+        sessions = [
+            EventCandidate(
+                event_date=spec.event_date,
+                start=spec.start,
+                end=spec.end,
+                segments=[],
+                session_index=index,
+                session_count=len(session_specs),
+                sibling_sessions=list(windows),
+                **shared,
+            )
+            for index, spec in enumerate(session_specs, start=1)
+        ]
+    else:
+        sessions = [
+            EventCandidate(
+                event_date=event_date, start=start, end=end, segments=segments,
+                **shared,
+            )
+        ]
+
+    diagnostics["candidate"] = sessions[0].as_dict()
+    diagnostics["sessions"] = [session.as_dict() for session in sessions]
+    diagnostics["sessions_found"] = len(sessions)
+    return sessions, diagnostics
 
 
 def _first_single_time(text: str) -> time | None:

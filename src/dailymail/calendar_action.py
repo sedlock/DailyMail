@@ -112,12 +112,24 @@ def _stamp(value: datetime) -> str:
     return value.strftime("%Y%m%dT%H%M%S")
 
 
-def slugify_filename(value: str, *, fallback: str = "event") -> str:
-    """A safe, predictable attachment filename. No path, no CR/LF, no quotes."""
+def slugify_filename(
+    value: str, *, fallback: str = "event", suffix: str | None = None
+) -> str:
+    """A safe, predictable attachment filename. No path, no CR/LF, no quotes.
+
+    `suffix` is appended verbatim after slugification and reserved out of the
+    length budget, so a multi-session announcement produces
+    `provost-s-coffee-hours-focus-on-research-2026-09-10.ics` and
+    `...-2026-09-21.ics` rather than two files the reader cannot tell apart.
+    """
+    tail = ""
+    if suffix:
+        tail = "-" + re.sub(r"[^A-Za-z0-9]+", "-", _CONTROL.sub("", suffix)).strip("-")
+    budget = max(8, 60 - len(tail))
     cleaned = _CONTROL.sub("", value or "")
     cleaned = re.sub(r"[^A-Za-z0-9]+", "-", cleaned).strip("-")
-    cleaned = re.sub(r"-{2,}", "-", cleaned)[:60].strip("-")
-    return f"{cleaned or fallback}.ics"
+    cleaned = re.sub(r"-{2,}", "-", cleaned)[:budget].strip("-")
+    return f"{cleaned or fallback}{tail}.ics"
 
 
 # --- VTIMEZONE ---------------------------------------------------------------
@@ -233,11 +245,25 @@ def _html_description(text: str, *, linkable: frozenset[str] = frozenset()) -> s
     return "<html><body>" + "".join(parts).replace("\n", "<br>") + "</body></html>"
 
 
-@dataclass
-class CalendarAction:
-    """Everything the renderer, the mailer and the audit trail need."""
+_MODE_LABELS = {
+    "in_person": "In person",
+    "virtual": "Virtual",
+    "hybrid": "In person / Hybrid",
+}
 
-    submission_id: str
+
+@dataclass
+class CalendarSession:
+    """One selectable sitting: its own button, its own `.ics`, its own travel.
+
+    An announcement that advertises a choice of dates produces one of these per
+    date. Everything the reader acts on lives here rather than on the series, so
+    a two-session Coffee Hours announcement cannot end up with one ambiguous
+    button and one ambiguous attachment.
+    """
+
+    index: int
+    count: int
     title: str
     start: datetime
     end: datetime
@@ -254,8 +280,6 @@ class CalendarAction:
     travel_mode: str = "none"
     travel_estimated: bool = False
     blocks: list[CalendarBlock] = field(default_factory=list)
-    registration_urls: list[str] = field(default_factory=list)
-    official_url: str | None = None
 
     @property
     def has_travel(self) -> bool:
@@ -265,12 +289,28 @@ class CalendarAction:
     def ics_bytes(self) -> bytes | None:
         return self.ics_text.encode("utf-8") if self.ics_text else None
 
-    # --- display helpers, used by the templates ---------------------------
     @property
     def when_line(self) -> str:
         """`Wed, Oct 14 · 10:00 AM–12:00 PM`, compact enough for a phone."""
         day = self.start.strftime("%a, %b %-d")
         return f"{day} · {_clock(self.start)}–{_clock(self.end)}"
+
+    @property
+    def day_label(self) -> str:
+        """`Thu, Sep 10` -- the shortest unambiguous label for a button."""
+        return self.start.strftime("%a, %b %-d")
+
+    @property
+    def button_label(self) -> str:
+        """What the tap target says.
+
+        A single-session announcement keeps the wording production already uses.
+        A series names its date instead, because "Add to Calendar" twice in one
+        card tells the reader nothing about which sitting they are choosing.
+        """
+        if self.count <= 1:
+            return "Add to Calendar"
+        return f"Add {self.day_label}"
 
     @property
     def travel_line(self) -> str | None:
@@ -295,11 +335,156 @@ class CalendarAction:
 
     @property
     def mode_label(self) -> str:
-        return {
-            "in_person": "In person",
-            "virtual": "Virtual",
-            "hybrid": "In person / Hybrid",
-        }.get(self.attendance_mode, "")
+        return _MODE_LABELS.get(self.attendance_mode, "")
+
+    @property
+    def location_line(self) -> str | None:
+        parts = [part for part in (self.location, self.mode_label) if part]
+        return " · ".join(parts) or None
+
+
+@dataclass
+class CalendarAction:
+    """One announcement's calendar offer: the series, and its sessions.
+
+    The top-level fields describe the *first* session and are what the renderer,
+    the mailer, the audit trail and every existing caller already read. `sessions`
+    is the authoritative list; for the overwhelmingly common single-session case
+    it holds exactly one entry synthesized from those same fields, so nothing
+    that predates multi-session support has to know the concept exists.
+    """
+
+    submission_id: str
+    title: str
+    start: datetime
+    end: datetime
+    timezone: str
+    location: str | None
+    attendance_mode: str
+    description: str
+    action_url: str
+    mechanism: str
+    ics_text: str | None = None
+    ics_filename: str | None = None
+    travel_minutes_before: int = 0
+    travel_minutes_after: int = 0
+    travel_mode: str = "none"
+    travel_estimated: bool = False
+    blocks: list[CalendarBlock] = field(default_factory=list)
+    registration_urls: list[str] = field(default_factory=list)
+    official_url: str | None = None
+    # Set only for a genuine series. Left empty for the overwhelmingly common
+    # single-session announcement, whose one session is *derived* from the
+    # fields above on every access rather than copied -- so the two can never
+    # drift apart, and existing callers that build or adjust a CalendarAction
+    # directly go on working without knowing sessions exist.
+    session_list: list[CalendarSession] = field(default_factory=list, repr=False)
+
+    @property
+    def sessions(self) -> list[CalendarSession]:
+        """Every sitting the reader can act on. Never empty."""
+        return self.session_list or [self._head_session()]
+
+    def _head_session(self) -> CalendarSession:
+        return CalendarSession(
+            index=1, count=1, title=self.title, start=self.start,
+            end=self.end, timezone=self.timezone, location=self.location,
+            attendance_mode=self.attendance_mode,
+            description=self.description, action_url=self.action_url,
+            mechanism=self.mechanism, ics_text=self.ics_text,
+            ics_filename=self.ics_filename,
+            travel_minutes_before=self.travel_minutes_before,
+            travel_minutes_after=self.travel_minutes_after,
+            travel_mode=self.travel_mode,
+            travel_estimated=self.travel_estimated,
+            blocks=list(self.blocks),
+        )
+
+    @classmethod
+    def from_sessions(
+        cls,
+        *,
+        submission_id: str,
+        title: str,
+        timezone: str,
+        location: str | None,
+        attendance_mode: str,
+        sessions: list[CalendarSession],
+        registration_urls: list[str] | None = None,
+        official_url: str | None = None,
+    ) -> CalendarAction:
+        """Build a series from its sessions, mirroring the first onto the series."""
+        if not sessions:
+            raise ValueError("a calendar action needs at least one session")
+        first = sessions[0]
+        return cls(
+            submission_id=submission_id,
+            title=title,
+            start=first.start,
+            end=first.end,
+            timezone=timezone,
+            location=location,
+            attendance_mode=attendance_mode,
+            description=first.description,
+            action_url=first.action_url,
+            mechanism=first.mechanism,
+            ics_text=first.ics_text,
+            ics_filename=first.ics_filename,
+            travel_minutes_before=first.travel_minutes_before,
+            travel_minutes_after=first.travel_minutes_after,
+            travel_mode=first.travel_mode,
+            travel_estimated=first.travel_estimated,
+            blocks=list(first.blocks),
+            registration_urls=list(registration_urls or []),
+            official_url=official_url,
+            session_list=list(sessions) if len(sessions) > 1 else [],
+        )
+
+    @property
+    def session_count(self) -> int:
+        return len(self.sessions)
+
+    @property
+    def is_multi_session(self) -> bool:
+        return len(self.sessions) > 1
+
+    @property
+    def sessions_line(self) -> str | None:
+        """`2 sessions — choose the one you will attend`, or nothing at all."""
+        if not self.is_multi_session:
+            return None
+        return (
+            f"{len(self.sessions)} sessions — choose the one you will attend"
+        )
+
+    @property
+    def has_travel(self) -> bool:
+        return any(session.has_travel for session in self.sessions)
+
+    @property
+    def ics_bytes(self) -> bytes | None:
+        return self.ics_text.encode("utf-8") if self.ics_text else None
+
+    # --- display helpers, used by the templates ---------------------------
+    #
+    # These describe the *first* sitting, computed from this object's own fields
+    # so that adjusting one is immediately visible. The templates render from
+    # `sessions` instead, because that is what the reader chooses between.
+    @property
+    def when_line(self) -> str:
+        return self._head_session().when_line
+
+    @property
+    def travel_line(self) -> str | None:
+        return self._head_session().travel_line
+
+    @property
+    def attachment_line(self) -> str | None:
+        return self._head_session().attachment_line
+
+    @property
+    def mode_label(self) -> str:
+        return _MODE_LABELS.get(self.attendance_mode, "")
 
     @property
     def location_line(self) -> str | None:
@@ -349,6 +534,41 @@ _LEADING_LABEL = re.compile(r"^\s*\(?[A-Z][A-Z &/'-]{2,24}\)?\s*(?::|[-–—])\
 
 _LEADING_EVENT_WORD = re.compile(r"^\s*event\s*[:\-–—]\s+", re.IGNORECASE)
 
+# A trailing parenthetical qualifier: `Provost's Coffee Hours (Focus on Research)`.
+# Flattened to ` - Focus on Research`, because a calendar list truncates and a
+# parenthesis is the first thing to be cut off. Purely typographic -- the words
+# are the source's own, in the source's own order, with nothing added.
+_TRAILING_PARENTHETICAL = re.compile(r"^(?P<head>.+?)\s*\((?P<tail>[^()]{3,40})\)\s*$")
+
+# Qualifiers that say how to attend rather than what the event is. Flattening
+# these would read as part of the name.
+_NON_QUALIFIER_PARENTHETICALS = frozenset(
+    {
+        "hybrid", "virtual", "online", "in person", "in-person", "remote",
+        "free", "no charge", "rsvp", "tba", "tbd", "cancelled", "canceled",
+        "new", "updated", "zoom", "webex", "teams", "optional", "required",
+    }
+)
+
+
+def _flatten_trailing_parenthetical(title: str) -> str:
+    match = _TRAILING_PARENTHETICAL.match(title)
+    if not match:
+        return title
+    head = match.group("head").strip(" -–—:|,;")
+    tail = match.group("tail").strip()
+    if len(head) < 3 or not re.search(r"[A-Za-z]", head):
+        return title
+    if not re.search(r"[A-Za-z]", tail):
+        return title
+    folded = tail.casefold().strip(" .")
+    if folded in _NON_QUALIFIER_PARENTHETICALS:
+        return title
+    # A date in the parenthesis is handled by `_TRAILING_DATE`, not here.
+    if re.search(r"\d{1,2}[/-]\d{1,2}", tail):
+        return title
+    return f"{head} - {tail}"
+
 
 def clean_calendar_title(raw: str | None, *, fallback: str = "") -> str:
     """Strip subject artefacts a calendar entry does not need.
@@ -365,11 +585,18 @@ def clean_calendar_title(raw: str | None, *, fallback: str = "") -> str:
         title = _LEADING_EVENT_WORD.sub("", title)
         title = _LEADING_BRACKET.sub("", title)
         title = _LEADING_LABEL.sub("", title)
-        stripped = _TRAILING_DATE.sub("", title).strip(" -–—:|(),[]")
-        # Only accept the trim if something recognizable is left; a title that
-        # is *only* a date keeps its date rather than becoming nothing.
-        if len(stripped) >= 3 and re.search(r"[A-Za-z]", stripped):
-            title = stripped
+        trimmed = _TRAILING_DATE.sub("", title)
+        if trimmed != title:
+            # The separator that introduced the date is now dangling, so it goes
+            # too. Conditional on the date actually having been removed: an
+            # unconditional strip turned `Town Hall (Hybrid)` into
+            # `Town Hall (Hybrid` by eating a perfectly balanced bracket.
+            stripped = trimmed.strip(" -–—:|(),[]")
+            # Only accept the trim if something recognizable is left; a title
+            # that is *only* a date keeps its date rather than becoming nothing.
+            if len(stripped) >= 3 and re.search(r"[A-Za-z]", stripped):
+                title = stripped
+        title = _flatten_trailing_parenthetical(title)
         title = title.strip(" -–—:|,;")
         title = " ".join(title.split())
 
@@ -377,6 +604,18 @@ def clean_calendar_title(raw: str | None, *, fallback: str = "") -> str:
 
 
 # --- UID ---------------------------------------------------------------------
+
+
+def session_suffix(candidate: EventCandidate, kind: str) -> str:
+    """The UID/attachment discriminator for one sitting.
+
+    A single-session announcement keeps the suffixes production already emits
+    (`event`, `travel-out`, `travel-back`), so re-rendering a past day still
+    produces byte-identical calendar data. Only a genuine series adds the date.
+    """
+    if candidate.session_count <= 1:
+        return kind
+    return f"{kind}-{candidate.event_date.isoformat()}"
 
 
 def build_uid(submission_id: str, content_hash: str | None, suffix: str) -> str:
@@ -429,6 +668,29 @@ def build_description(
             label = segment.label.strip() if segment.label else None
             schedule.append(f"  {span}" + (f" — {_titlecase(label)}" if label else ""))
         sections.append("\n".join(schedule))
+
+    if candidate.is_session_of_series:
+        # The reader is holding one sitting of several. Saying which, and what
+        # the alternatives were, is the difference between a useful appointment
+        # and one they cannot reconcile against the email a week later.
+        listing = [
+            f"This is session {candidate.session_index} of "
+            f"{candidate.session_count} offered by the announcement."
+        ]
+        for index, (day, start, end) in enumerate(
+            candidate.sibling_sessions, start=1
+        ):
+            when_text = day.strftime("%A, %B %-d")
+            clock = _clock(datetime.combine(day, start))
+            if end is not None:
+                clock = f"{clock}–{_clock(datetime.combine(day, end))}"
+            marker = "  * " if index == candidate.session_index else "    "
+            suffix = "  (this entry)" if index == candidate.session_index else ""
+            listing.append(f"{marker}{when_text}, {clock}{suffix}")
+        listing.append(
+            "  Registering for one session does not reserve the others."
+        )
+        sections.append("Sessions offered\n" + "\n".join(listing))
 
     location_lines: list[str] = []
     if candidate.location:
@@ -507,7 +769,10 @@ def build_blocks(
     if travel_minutes_before > 0:
         blocks.append(
             CalendarBlock(
-                uid=build_uid(candidate.submission_id, content_hash, "travel-out"),
+                uid=build_uid(
+                    candidate.submission_id, content_hash,
+                    session_suffix(candidate, "travel-out"),
+                ),
                 summary=sanitize_text(f"{verb} {place}", limit=120),
                 start=candidate.start_datetime - timedelta(minutes=travel_minutes_before),
                 end=candidate.start_datetime,
@@ -522,7 +787,10 @@ def build_blocks(
 
     blocks.append(
         CalendarBlock(
-            uid=build_uid(candidate.submission_id, content_hash, "event"),
+            uid=build_uid(
+                candidate.submission_id, content_hash,
+                session_suffix(candidate, "event"),
+            ),
             summary=sanitize_text(event_title, limit=200),
             start=candidate.start_datetime,
             end=candidate.end_datetime,
@@ -539,7 +807,10 @@ def build_blocks(
     if travel_minutes_after > 0:
         blocks.append(
             CalendarBlock(
-                uid=build_uid(candidate.submission_id, content_hash, "travel-back"),
+                uid=build_uid(
+                    candidate.submission_id, content_hash,
+                    session_suffix(candidate, "travel-back"),
+                ),
                 summary=sanitize_text(f"{return_verb} {place}", limit=120),
                 start=candidate.end_datetime,
                 end=candidate.end_datetime + timedelta(minutes=travel_minutes_after),
@@ -622,30 +893,60 @@ def _compose(parameters: dict, body: str) -> str:
 
 
 def validate_action(action: CalendarAction) -> None:
-    """Last gate. A malformed calendar action must never reach the email."""
+    """Last gate. A malformed calendar action must never reach the email.
+
+    Every session is checked, not merely the series head, and the sessions are
+    checked against each other: two sittings that share a start time or an
+    attachment filename would be indistinguishable to the reader, which is a
+    defect even though each one is individually well formed.
+    """
     if not action.title.strip():
         raise ValueError("calendar action has no title")
-    if action.end <= action.start:
-        raise ValueError("calendar action ends before it starts")
-    if not action.action_url.startswith(OUTLOOK_COMPOSE_URL + "?"):
-        raise ValueError("calendar action URL is not an Outlook compose link")
-    if any(char in action.action_url for char in ("\n", "\r", " ", '"', "<", ">")):
-        raise ValueError("calendar action URL contains an unusable character")
-    if action.ics_text is not None:
-        if not action.ics_text.startswith("BEGIN:VCALENDAR"):
+    if not action.sessions:
+        raise ValueError("calendar action has no sessions")
+
+    starts: set[datetime] = set()
+    filenames: set[str] = set()
+    for session in action.sessions:
+        _validate_session(session)
+        if session.start in starts:
+            raise ValueError(
+                f"two calendar sessions both start at {session.start.isoformat()}"
+            )
+        starts.add(session.start)
+        if session.ics_filename:
+            if session.ics_filename in filenames:
+                raise ValueError(
+                    f"two calendar sessions share the attachment name "
+                    f"{session.ics_filename!r}"
+                )
+            filenames.add(session.ics_filename)
+
+
+def _validate_session(session: CalendarSession) -> None:
+    if not session.title.strip():
+        raise ValueError("calendar session has no title")
+    if session.end <= session.start:
+        raise ValueError("calendar session ends before it starts")
+    if not session.action_url.startswith(OUTLOOK_COMPOSE_URL + "?"):
+        raise ValueError("calendar session URL is not an Outlook compose link")
+    if any(char in session.action_url for char in ("\n", "\r", " ", '"', "<", ">")):
+        raise ValueError("calendar session URL contains an unusable character")
+    if session.ics_text is not None:
+        if not session.ics_text.startswith("BEGIN:VCALENDAR"):
             raise ValueError("ICS payload is not a VCALENDAR")
-        if not action.ics_text.rstrip().endswith("END:VCALENDAR"):
+        if not session.ics_text.rstrip().endswith("END:VCALENDAR"):
             raise ValueError("ICS payload is truncated")
-        if "\r\n" not in action.ics_text:
+        if "\r\n" not in session.ics_text:
             raise ValueError("ICS payload is not CRLF-delimited")
-        if _CONTROL.search(action.ics_text):
+        if _CONTROL.search(session.ics_text):
             raise ValueError("ICS payload contains a control character")
-        if action.ics_filename and (
-            "/" in action.ics_filename
-            or "\\" in action.ics_filename
-            or not action.ics_filename.endswith(".ics")
+        if session.ics_filename and (
+            "/" in session.ics_filename
+            or "\\" in session.ics_filename
+            or not session.ics_filename.endswith(".ics")
         ):
-            raise ValueError(f"unusable ICS filename {action.ics_filename!r}")
+            raise ValueError(f"unusable ICS filename {session.ics_filename!r}")
 
 
 def official_ics_dtstamp(target_date: str) -> datetime:

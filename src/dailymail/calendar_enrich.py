@@ -48,6 +48,10 @@ class CalendarMetrics:
     route_failures: int = 0
     titles_cleaned: int = 0
     build_failures: int = 0
+    # Announcements offering more than one selectable sitting, and the total
+    # number of calendar controls those sittings produced.
+    multi_session_announcements: int = 0
+    session_actions_offered: int = 0
     duration_seconds: float = 0.0
     errors: list[str] = field(default_factory=list)
 
@@ -66,6 +70,8 @@ class CalendarMetrics:
             "route_failures": self.route_failures,
             "titles_cleaned": self.titles_cleaned,
             "build_failures": self.build_failures,
+            "multi_session": self.multi_session_announcements,
+            "session_actions": self.session_actions_offered,
             "duration_seconds": round(self.duration_seconds, 3),
             "errors": self.errors[:5],
         }
@@ -172,10 +178,15 @@ def _value(row, key, default=None):
 def detect_candidates(rows, *, target_date: str, settings: Settings):
     """Every schedulable event in one day. Returns `(candidates, diagnostics)`.
 
+    `candidates` maps a submission id to the *list of sessions* that
+    announcement offers -- one entry for an ordinary event, one per advertised
+    sitting for a series. Relevance is still judged once per announcement, so
+    this costs no extra model call.
+
     Runs *before* curation so the relevance question can ride along on the call
     that already happens. Never raises.
     """
-    candidates: dict[str, events.EventCandidate] = {}
+    candidates: dict[str, list[events.EventCandidate]] = {}
     diagnostics: dict[str, dict] = {}
     if not settings.calendar_enabled:
         return candidates, diagnostics
@@ -184,7 +195,7 @@ def detect_candidates(rows, *, target_date: str, settings: Settings):
     for row in rows:
         submission_id = str(row["submission_id"])
         try:
-            candidate, diagnosis = events.detect_candidate(
+            sessions, diagnosis = events.detect_series(
                 row, reference_date=reference
             )
         except Exception as exc:  # noqa: BLE001 - never lose an announcement
@@ -195,9 +206,28 @@ def detect_candidates(rows, *, target_date: str, settings: Settings):
             log.info("event parse failed for %s: %s", submission_id, exc)
             continue
         diagnostics[submission_id] = diagnosis
-        if candidate is not None:
-            candidates[submission_id] = candidate
+        if sessions:
+            candidates[submission_id] = sessions
     return candidates, diagnostics
+
+
+def primary_candidates(candidates: dict) -> dict:
+    """The one session per announcement that stands for the whole series.
+
+    Relevance, the curation payload and the audit row are all announcement-level
+    questions; this is the view they take of a session list.
+    """
+    out = {}
+    for submission_id, value in (candidates or {}).items():
+        out[submission_id] = value[0] if isinstance(value, list) else value
+    return out
+
+
+def _sessions_for(candidates: dict, submission_id: str) -> list:
+    value = (candidates or {}).get(submission_id)
+    if value is None:
+        return []
+    return list(value) if isinstance(value, list) else [value]
 
 
 def enrich_digest(
@@ -244,7 +274,8 @@ def enrich_digest(
     offered = 0
 
     for submission_id, row in rows_by_id.items():
-        candidate = candidates.get(submission_id)
+        sessions = _sessions_for(candidates, submission_id)
+        candidate = sessions[0] if sessions else None
         diagnosis = diagnostics.get(submission_id) or {}
         if candidate is None:
             records.append(
@@ -261,7 +292,7 @@ def enrich_digest(
             action, record = _build_one(
                 connection,
                 row=row,
-                candidate=candidate,
+                sessions=sessions,
                 diagnosis=diagnosis,
                 judgement=judgements.get(submission_id),
                 target_date=target_date,
@@ -295,6 +326,9 @@ def enrich_digest(
             actions[submission_id] = action
             offered += 1
             metrics.actions_offered += 1
+            metrics.session_actions_offered += action.session_count
+            if action.is_multi_session:
+                metrics.multi_session_announcements += 1
             if action.has_travel:
                 metrics.travel_enriched += 1
 
@@ -312,7 +346,7 @@ def _build_one(
     connection,
     *,
     row,
-    candidate,
+    sessions,
     diagnosis,
     judgement,
     target_date,
@@ -325,6 +359,10 @@ def _build_one(
     curation_model,
 ):
     submission_id = str(row["submission_id"])
+    # Relevance, attendance mode and the title are announcement-level decisions,
+    # made once from the first session and applied to every sitting. That is the
+    # whole reason a multi-session announcement costs no extra model call.
+    candidate = sessions[0]
 
     # --- relevance ------------------------------------------------------
     if judgement is not None:
@@ -395,6 +433,10 @@ def _build_one(
         )
 
     # --- venue and travel --------------------------------------------------
+    # The venue belongs to the announcement, so it is resolved once. Travel
+    # minutes are a property of the place, not of the sitting, so the same plan
+    # applies to every session -- but each session gets its own holds, at its
+    # own times, in its own .ics.
     resolution, plan = _venue_and_travel(
         connection,
         candidate=candidate,
@@ -406,8 +448,64 @@ def _build_one(
         row=row,
     )
 
-    # --- build ------------------------------------------------------------
+    # --- build one session at a time ---------------------------------------
     official_url = row["official_url"]
+    built: list[calendar_action.CalendarSession] = []
+    for session_candidate in sessions:
+        built.append(
+            _build_session(
+                session_candidate,
+                row=row,
+                title=title,
+                mode=mode,
+                plan=plan,
+                settings=settings,
+                target_date=target_date,
+                official_url=official_url,
+                multi=len(sessions) > 1,
+            )
+        )
+
+    action = calendar_action.CalendarAction.from_sessions(
+        submission_id=submission_id,
+        title=title,
+        timezone=candidate.timezone,
+        location=candidate.location,
+        attendance_mode=mode,
+        sessions=built,
+        registration_urls=list(candidate.registration_urls),
+        official_url=official_url,
+    )
+    calendar_action.validate_action(action)
+
+    return action, _record(
+        submission_id, row,
+        is_candidate=True, evidence=diagnosis, candidate=candidate,
+        score=score, reason=reason, method=method, model=model,
+        attendance_mode=mode, title=title, offer=True,
+        resolution=resolution, plan=plan, action=action,
+    )
+
+
+def _build_session(
+    candidate,
+    *,
+    row,
+    title,
+    mode,
+    plan,
+    settings,
+    target_date,
+    official_url,
+    multi,
+):
+    """One sitting's description, deep link, VEVENTs and `.ics`.
+
+    Called once for an ordinary event and once per advertised sitting for a
+    series. Nothing here is announcement-level: everything it needs has already
+    been decided by the caller, which is what keeps a series from re-asking the
+    model or re-resolving the venue.
+    """
     travel_note = None
     if plan.required:
         travel_note = (
@@ -431,8 +529,6 @@ def _build_one(
         candidate, description=description, title=title
     )
 
-    ics_text = None
-    ics_filename = None
     blocks = calendar_action.build_blocks(
         candidate,
         content_hash=row["content_hash"],
@@ -443,16 +539,25 @@ def _build_one(
         travel_minutes_after=plan.minutes_after if plan.required else 0,
         travel_mode=plan.mode,
     )
+
+    ics_text = None
+    ics_filename = None
     if settings.calendar_attach_ics:
         ics_text = calendar_action.build_ics(
             blocks,
             timezone=candidate.timezone,
             dtstamp=calendar_action.official_ics_dtstamp(target_date),
         )
-        ics_filename = calendar_action.slugify_filename(title)
+        # A series dates its attachments so the reader can tell which file is
+        # which; a single event keeps the name production already produces.
+        ics_filename = calendar_action.slugify_filename(
+            title,
+            suffix=candidate.event_date.isoformat() if multi else None,
+        )
 
-    action = calendar_action.CalendarAction(
-        submission_id=submission_id,
+    return calendar_action.CalendarSession(
+        index=candidate.session_index,
+        count=candidate.session_count,
         title=title,
         start=candidate.start_datetime,
         end=candidate.end_datetime,
@@ -473,17 +578,6 @@ def _build_one(
         travel_mode=plan.mode,
         travel_estimated=plan.estimated,
         blocks=blocks,
-        registration_urls=list(candidate.registration_urls),
-        official_url=official_url,
-    )
-    calendar_action.validate_action(action)
-
-    return action, _record(
-        submission_id, row,
-        is_candidate=True, evidence=diagnosis, candidate=candidate,
-        score=score, reason=reason, method=method, model=model,
-        attendance_mode=mode, title=title, offer=True,
-        resolution=resolution, plan=plan, action=action,
     )
 
 
@@ -639,4 +733,28 @@ def _record(
         "ics_bytes": len(action.ics_bytes) if action and action.ics_bytes else None,
         "validation_status": validation_status,
         "withheld_reason": withheld_reason,
+        "session_count": (
+            action.session_count
+            if action
+            else (candidate.session_count if candidate else None)
+        ),
+        # One auditable line per offered sitting: date, time, and which file
+        # carries it. This is what makes "did the reader get two buttons?"
+        # answerable from the database alone.
+        "sessions": json.dumps(
+            [
+                {
+                    "index": session.index,
+                    "start": session.start.isoformat(),
+                    "end": session.end.isoformat(),
+                    "ics_filename": session.ics_filename,
+                    "travel_minutes_before": session.travel_minutes_before,
+                    "travel_minutes_after": session.travel_minutes_after,
+                }
+                for session in action.sessions
+            ],
+            sort_keys=True,
+        )
+        if action
+        else None,
     }

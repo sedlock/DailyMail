@@ -614,3 +614,63 @@ def make_town_hall_row(**overrides) -> dict:
     }
     row.update(overrides)
     return row
+
+
+# --- the 1 September 2026 regression fixtures ---------------------------------
+#
+# Four production announcements, captured verbatim into
+# `artifacts/qa/fixtures/render-regression.json` and loaded here so the Python
+# suite and the browser suite assert against exactly the same bytes:
+#
+#   6612  the colour leak       every paragraph wrapped in the design's own accent
+#   6736  the colour control    no source colour at all; renders correctly
+#   6702  the multi-session     two selectable sittings of one event
+#   6694  the single-session    one sitting, a real room, a travel hold
+#
+# Contact blocks are absent and body email addresses are redacted; the inline
+# colour declarations and the dated session lines are the source's own.
+
+RENDER_REGRESSION_PATH = (
+    REPO_ROOT / "artifacts" / "qa" / "fixtures" / "render-regression.json"
+)
+
+
+def _load_render_regression() -> dict[str, dict]:
+    document = json.loads(RENDER_REGRESSION_PATH.read_text(encoding="utf-8"))
+    return {
+        str(entry["submission_id"]): entry for entry in document["announcements"]
+    }
+
+
+RENDER_REGRESSION = _load_render_regression()
+
+PROFESSIONAL_BODY = RENDER_REGRESSION["6612"]["full_body"]
+PROFESSIONAL_TEXT = RENDER_REGRESSION["6612"]["body_text"]
+OSEC_BODY = RENDER_REGRESSION["6736"]["full_body"]
+OSEC_TEXT = RENDER_REGRESSION["6736"]["body_text"]
+COFFEE_HOURS_BODY = RENDER_REGRESSION["6702"]["full_body"]
+COFFEE_HOURS_TEXT = RENDER_REGRESSION["6702"]["body_text"]
+
+
+def regression_record(submission_id: str, **overrides) -> dict:
+    """One committed fixture in the shape `db.record_announcement` expects."""
+    entry = RENDER_REGRESSION[str(submission_id)]
+    record = {
+        "submission_id": int(entry["submission_id"]),
+        "title": entry["title"],
+        "full_body": entry["full_body"],
+        "body_text": entry["body_text"],
+        "source_audience": entry["source_audience"],
+        "category_id": entry["category_id"],
+        "distribution_dates": ["2026-09-01"],
+        "first_distribution_date": "2026-09-01",
+        "status": "New",
+        "is_event": entry.get("is_event") or 0,
+        "event_name": entry.get("event_name"),
+        "event_date": entry.get("event_date"),
+        "event_start_time": entry.get("event_start_time"),
+        "event_end_time": entry.get("event_end_time"),
+        "event_location": entry.get("event_location"),
+    }
+    record.update(overrides)
+    return record

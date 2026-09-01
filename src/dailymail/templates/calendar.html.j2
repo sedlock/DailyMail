@@ -6,9 +6,16 @@
     button border; gold is a 3px left rule, so the block reads as an action note
     rather than competing with the NEW/UPDATED badges above it.
 
-    The button is a 44px-tall tap target on a phone, and the event's *actual*
-    advertised time is always the line above it -- travel is described
-    separately and never folded into the stated time. -#}
+    Each button is a 44px-tall tap target on a phone, and the *actual* advertised
+    time is always the line above it -- travel is described separately and never
+    folded into the stated time.
+
+    An announcement can offer several selectable sittings of the same event. Each
+    one gets its own row: its own time, its own button naming its own date, and
+    its own `.ics` filename. Outlook and iOS will still auto-link the plain dates
+    in the announcement body below; these controls are visually distinct from
+    that (a solid brown block, not blue underlined text) and are the only ones
+    that carry the subject, description, location, links and travel. -#}
 {%- if item.calendar %}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:9px 0 3px 0;">
       <tr><td style="background:#f6f7fa;border-left:3px solid #FFCC00;padding:8px 11px 9px 11px;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;">
@@ -16,24 +23,32 @@
           CALENDAR
         </div>
         <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:14px;line-height:1.35;font-weight:bold;color:#1a1a1a;">{{ item.calendar.title }}</div>
-        <div class="cal-when" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;line-height:1.45;color:#3a3a3a;padding:1px 0 0 0;">{{ item.calendar.when_line }}</div>
         {%- if item.calendar.location_line %}
         <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;line-height:1.45;color:#3a3a3a;">{{ item.calendar.location_line }}</div>
         {%- endif %}
-        <div style="padding:6px 0 0 0;">
-          <a href="{{ item.calendar.action_url }}" target="_blank" rel="noopener noreferrer"
-             style="display:inline-block;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;font-weight:bold;color:#ffffff;background:#57150B;text-decoration:none;padding:11px 16px;letter-spacing:0.3px;">Add to Calendar&nbsp;&rsaquo;</a>
-        </div>
-        {%- if item.calendar.travel_line %}
-        <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:11px;line-height:1.45;color:#6b6b6b;padding:5px 0 0 0;">
-          {{ item.calendar.travel_line }}
-        </div>
+        {%- if item.calendar.sessions_line %}
+        <div class="cal-sessions" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:12px;line-height:1.45;font-weight:bold;color:#57150B;padding:4px 0 0 0;">{{ item.calendar.sessions_line }}</div>
         {%- endif %}
-        {%- if item.calendar.attachment_line %}
-        <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:11px;line-height:1.45;color:#6b6b6b;padding:3px 0 0 0;">
-          {{ item.calendar.attachment_line }}
+
+        {%- for session in item.calendar.sessions %}
+        <div class="cal-session" style="padding:{{ '7px' if item.calendar.is_multi_session or not loop.first else '1px' }} 0 0 0;">
+          <div class="cal-when" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;line-height:1.45;color:#3a3a3a;">{{ session.when_line }}</div>
+          <div style="padding:6px 0 0 0;">
+            <a class="cal-button" href="{{ session.action_url }}" target="_blank" rel="noopener noreferrer"
+               style="display:inline-block;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;font-weight:bold;color:#ffffff;background:#57150B;text-decoration:none;padding:11px 16px;letter-spacing:0.3px;">{{ session.button_label }}&nbsp;&rsaquo;</a>
+          </div>
+          {%- if session.travel_line %}
+          <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:11px;line-height:1.45;color:#6b6b6b;padding:5px 0 0 0;">
+            {{ session.travel_line }}
+          </div>
+          {%- endif %}
+          {%- if session.attachment_line %}
+          <div style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:11px;line-height:1.45;color:#6b6b6b;padding:3px 0 0 0;">
+            {{ session.attachment_line }}
+          </div>
+          {%- endif %}
         </div>
-        {%- endif %}
+        {%- endfor %}
       </td></tr>
     </table>
 

@@ -508,14 +508,14 @@ def test_an_event_parse_crash_costs_one_button_and_nothing_else(
     _row(calendar_db, submission_id=9002)
     rows = db.digest_rows(calendar_db, TARGET)
 
-    real = events.detect_candidate
+    real = events.detect_series
 
     def explode(row, **kwargs):
         if str(row["submission_id"]) == "9001":
             raise RuntimeError("boom")
         return real(row, **kwargs)
 
-    monkeypatch.setattr(calendar_enrich.events, "detect_candidate", explode)
+    monkeypatch.setattr(calendar_enrich.events, "detect_series", explode)
     actions, metrics = enrich(calendar_db, rows, settings_obj)
     assert metrics.parse_failures == 1
     assert "9002" in actions

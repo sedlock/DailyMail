@@ -381,6 +381,123 @@ def _inline_default_margins(html: str) -> str:
     return _OPEN_TAG.sub(replace, html)
 
 
+# --- render-time colour policy ------------------------------------------------
+#
+# `filter_style` above is the *security* allowlist: it decides what CSS is inert
+# enough to survive at all, and `color` legitimately is. What it cannot decide is
+# whether an author's colour makes sense inside DailyMail's own design, and on
+# 1 September 2026 one did not.
+#
+# Rowan announcement 6612, "Nominate the PROFessional(s) of the Month", wraps
+# every paragraph of its body in:
+#
+#     <span style="color:rgb(90,19,0);">...</span>
+#
+# `rgb(90,19,0)` is `#5A1300` -- within three points of DailyMail's own accent
+# `#57150B`, the colour the card's headline is painted in. In light rendering it
+# merely looked odd. In Outlook mobile's dark mode, which force-inverts the
+# design, the author's dark maroon and the design's dark maroon invert to the
+# *same* peach, so the entire article rendered as if it were all headline. The
+# control case that renders correctly, 6736 (OSEC), simply carries no `color`
+# at all and inherits the body colour.
+#
+# So the renderer establishes a hard boundary around sanitized announcement
+# content: source text colours are dropped and DailyMail's own are inlined.
+# Structure, emphasis, lists, tables and links all still work -- only the
+# palette is DailyMail's to choose, because only DailyMail knows what the
+# surrounding card and the reader's dark mode are doing.
+#
+# The stored `FullBody` is untouched. This operates on the render derivative.
+
+_COLOUR_PROPERTIES = frozenset({"color", "background-color"})
+
+# Elements that directly contain body prose, and therefore need the body colour
+# pinned on them rather than inherited across an unknown number of wrappers.
+BODY_TEXT_TAGS = frozenset(
+    {
+        "p", "div", "li", "td", "th", "blockquote", "pre", "code", "caption",
+        "dt", "dd", "figcaption", "small",
+    }
+)
+BODY_HEADING_TAGS = frozenset({"h1", "h2", "h3", "h4", "h5", "h6"})
+
+
+@dataclass(frozen=True)
+class BodyColorPolicy:
+    """The colours DailyMail imposes on announcement body copy.
+
+    Defaults mirror `email.html.j2`: `INK` for prose, `BROWN` for headings and
+    links. Passing `strip_source_colors=False` disables the policy entirely,
+    which is what the pure-sanitizer tests use to prove the security allowlist
+    is unchanged.
+    """
+
+    body: str = "#1a1a1a"
+    heading: str = "#57150B"
+    link: str = "#57150B"
+    strip_source_colors: bool = True
+
+
+def strip_colour_declarations(style: str) -> str:
+    """Remove `color` and `background-color`, keep every other declaration."""
+    kept = []
+    for declaration in (style or "").split(";"):
+        name, separator, value = declaration.partition(":")
+        if not separator:
+            continue
+        name, value = name.strip(), value.strip()
+        if not name or not value or name.lower() in _COLOUR_PROPERTIES:
+            continue
+        kept.append(f"{name}:{value}")
+    return ";".join(kept)
+
+
+def apply_body_color_policy(html: str, policy: BodyColorPolicy) -> str:
+    """Repaint sanitized body copy in DailyMail's palette. Idempotent.
+
+    Runs after `clean()`, so it only ever sees markup a real HTML sanitizer has
+    already approved and cannot reintroduce anything unsafe: it edits the value
+    of one attribute and never the tag structure.
+    """
+    if not html or not policy.strip_source_colors:
+        return html
+
+    def replace(match: re.Match) -> str:
+        tag = match.group(1).lower()
+        attrs = match.group(2) or ""
+        style_match = re.search(r'style\s*=\s*"([^"]*)"', attrs, re.IGNORECASE)
+        existing = style_match.group(1) if style_match else ""
+        cleaned = strip_colour_declarations(existing)
+
+        if tag in BODY_HEADING_TAGS:
+            forced = policy.heading
+        elif tag == "a":
+            forced = policy.link
+        elif tag in BODY_TEXT_TAGS:
+            forced = policy.body
+        else:
+            # `span`, `strong`, `em`, `u`, `img`, `ul`, `table`, ... Their colour
+            # comes from the block they sit in, so pinning it here would only
+            # add bytes. Their *source* colour is still gone.
+            forced = None
+        if forced:
+            cleaned = f"{cleaned};color:{forced}" if cleaned else f"color:{forced}"
+
+        if style_match:
+            if cleaned:
+                return (
+                    f"<{tag}{attrs[: style_match.start(1)]}{cleaned}"
+                    f"{attrs[style_match.end(1) :]}>"
+                )
+            remainder = (attrs[: style_match.start()] + attrs[style_match.end() :]).strip()
+            return f"<{tag} {remainder}>" if remainder else f"<{tag}>"
+        if cleaned:
+            return f'<{tag}{attrs} style="{cleaned}">'
+        return match.group(0)
+
+    return _OPEN_TAG.sub(replace, html)
+
+
 def tighten(html: str) -> str:
     """Cosmetic density pass. Runs after sanitization, so it only ever sees
     already-safe markup and cannot reintroduce anything unsafe."""
@@ -393,11 +510,22 @@ def tighten(html: str) -> str:
     return _inline_default_margins(current)
 
 
-def sanitize_body(html: str, *, image_resolver=None) -> tuple[str, LinkStats, int]:
-    """Full pipeline. Returns (safe_html, link_stats, images_seen)."""
+def sanitize_body(
+    html: str, *, image_resolver=None, color_policy: BodyColorPolicy | None = None
+) -> tuple[str, LinkStats, int]:
+    """Full pipeline. Returns (safe_html, link_stats, images_seen).
+
+    `color_policy` is the render-time presentation pass. It is deliberately
+    optional and off by default: sanitization decides what is *safe*, the policy
+    decides what is *legible inside DailyMail's card*, and keeping them separate
+    means the security allowlist can be tested without a palette in scope.
+    """
     prefiltered = prefilter(html)
     rewritten, stats, images = transform(prefiltered, image_resolver=image_resolver)
-    return tighten(clean(rewritten)), stats, images
+    safe = tighten(clean(rewritten))
+    if color_policy is not None:
+        safe = apply_body_color_policy(safe, color_policy)
+    return safe, stats, images
 
 
 # --- duplicate leading heading ------------------------------------------------

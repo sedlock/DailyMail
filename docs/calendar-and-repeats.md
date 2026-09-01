@@ -4,6 +4,12 @@ Companion to `docs/site-reconnaissance.md` (Phase 0),
 `docs/collector-architecture.md` (Phase 1), `docs/operations.md` (Phase 2) and
 `docs/parking-enrichment.md` (Phase 3), all of which remain accurate.
 
+> **Superseded in three places by Phase 5.** Multi-sitting announcements are no
+> longer withheld as `multiple_distinct_dates` (§3 there), logical repeats now
+> resolve against durable families rather than a moving corpus (§2 there), and
+> the schema is v4 (§8 there). Every paragraph below marked **Phase 5** points
+> at `docs/logical-families-and-sessions.md`; everything else still holds.
+
 Phase 4 adds three things: an `Add to Calendar` action on announcements that
 describe a genuinely relevant scheduled event, detection of announcements Rowan
 reposted under a new SubmissionId, and two render-time cleanups.
@@ -41,7 +47,8 @@ without re-deriving it.
 | Withheld because | Example |
 |---|---|
 | `no_event_date` / `no_event_time` | "Homecoming is on Saturday, October 24" with no time |
-| `multiple_distinct_dates` | Provost's Coffee Hours: two sittings a fortnight apart |
+| `multiple_distinct_dates` | dates the source did not pin to their own time ranges — **Phase 5**: Provost's Coffee Hours no longer falls here |
+| `too_many_sessions` | **Phase 5**: more than six sittings is a timetable, not a choice |
 | `recurring_schedule` | "9 a.m. - 2:35 p.m. Monday - Thursday" — a term timetable |
 | `overlapping_time_blocks` | one announcement carrying Glassboro *and* Camden schedules |
 | `deadline_not_event` | "applications are due by October 14" |
@@ -245,6 +252,13 @@ Rowan calls New: *has this reader already been sent this?* It compares against
 `db.delivered_history()` — announcements in a digest that was **actually
 delivered**, not merely collected.
 
+> **Phase 5** adds a second candidate source beside the delivered corpus: the
+> durable logical family this announcement belongs to, which reaches members
+> however long ago they were delivered. It only widens the pool — every veto
+> below still applies to every comparison. It also adds two vetoes (a change in
+> the dates a body names, and the `UPDATED` badge on a substantive edit in the
+> near-identical band). See `docs/logical-families-and-sessions.md` §2.
+
 Hard requirements, every one a veto rather than a weight:
 
 * normalized-identical title (emoji, curly quotes and punctuation folded)
@@ -259,7 +273,7 @@ Then, by tier:
 | Similarity | Extra evidence | Result |
 |---|---|---|
 | ≥ 0.995 | same links | repeat, confidence 0.99 |
-| ≥ 0.97 | same links and same submitter | repeat, confidence 0.92 |
+| ≥ 0.97 | same links and same submitter | repeat, confidence 0.92 (**Phase 5**: plus `UPDATED` unless the change is only a spelling correction) |
 | ≥ 0.85 | same submitter, same contact, and at most 2 of the prior body's distinctive words removed | repeat **and updated**, confidence 0.80 |
 | below 0.85 | — | stays New |
 
@@ -352,8 +366,11 @@ venue_cache_days = 180
 
 ## 9. Storage
 
-Schema version **3**. Additive and idempotent, exactly like the v2 parking
-upgrade: `CREATE TABLE IF NOT EXISTS` plus guarded `ALTER TABLE ... ADD COLUMN`.
+Schema version **3** at the time of writing; **Phase 5 raises it to v4**, adding
+`logical_announcement_families`, `logical_announcement_members`,
+`display_status_corrections`, `repeat_matches.family_id` and two session columns
+on `calendar_recommendations`. Additive and idempotent, exactly like the v2
+parking upgrade: `CREATE TABLE IF NOT EXISTS` plus guarded `ALTER TABLE ... ADD COLUMN`.
 No existing table is rewritten and no announcement content is read, so a failure
 leaves v2 intact.
 

@@ -58,6 +58,21 @@ def parked_pipeline(monkeypatch, settings_obj, employee_fixture, student_fixture
 # --- the digest ---------------------------------------------------------------
 
 
+def _decoded_body(prepared) -> str:
+    """Every text part of the message, decoded.
+
+    Deliberately not `message.as_string()`: that returns the quoted-printable
+    *encoding*, where a soft line break can fall in the middle of any phrase, so
+    a substring assertion against it passes or fails on payload length rather
+    than on content.
+    """
+    return "\n".join(
+        part.get_content()
+        for part in prepared.message.walk()
+        if part.get_content_maintype() == "text"
+    )
+
+
 def test_a_run_with_an_empty_catalog_bootstraps_and_enriches(parked_pipeline, settings_obj):
     """First run after the upgrade: the catalog is empty, O-1 is a miss, and the
     miss path fills the cache and enriches the same digest."""
@@ -71,7 +86,7 @@ def test_a_run_with_an_empty_catalog_bootstraps_and_enriches(parked_pipeline, se
     assert result.parking["new_resolutions"] == 1
     assert result.parking["resolver_calls"] == 0
 
-    body = sent[0].message.as_string()
+    body = _decoded_body(sent[0])
     assert "PARKING LOCATION" in body
     assert "Lot O-1" in body
 
@@ -286,7 +301,7 @@ def test_a_parking_source_outage_does_not_alert_or_fail(
     assert result.parking["unresolved"] == 1
     assert result.parking["errors"]
 
-    body = sent[0].message.as_string()
+    body = _decoded_body(sent[0])
     # The complete digest still goes out, with the compact honest fallback and
     # no invented geography.
     assert "Parking Lot O-1 will be closed" in body
