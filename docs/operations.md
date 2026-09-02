@@ -100,7 +100,7 @@ uv run dailymail families --recheck 2026-09-01 --apply    # persist + audit
 uv run dailymail sessions --date 2026-09-01      # detected calendar sittings
 uv run dailymail sessions --date 2026-09-01 --submission 6702 --ics
 
-# tests
+# tests (§11 "The hermetic test boundary" for what the normal run may touch)
 uv run pytest                                    # hermetic, no network
 DAILYMAIL_LIVE_PARKING=1 uv run pytest tests/test_parking_live.py
 DAILYMAIL_VISUAL_QA=1 uv run pytest tests/test_visual_qa.py
@@ -558,6 +558,45 @@ curation payload; the test suite sweeps every text column in the database.
 
 Published contact, submitter and approver details **are** retained — they are
 part of the announcement as Rowan publishes it and appear in the digest.
+
+### The hermetic test boundary
+
+`uv run pytest` must reach nothing real, and that is enforced rather than
+intended. `tests/hermetic_boundary.py` installs a CPython audit hook at
+collection time and refuses, before the operation happens, any attempt to:
+
+* resolve or connect to anything but loopback — which is what reaching
+  `apps.rowan.edu` or `smtp.gmail.com` requires;
+* open an SMTP conversation at all;
+* open anything under the real `~/.config/dailymail`,
+  `~/.local/share/dailymail` or `~/.local/state/dailymail`, which covers the
+  production database, the run lock, the collection artifacts and the App
+  Password;
+* `sqlite3.connect` the production database;
+* run `systemctl`/`loginctl`/`journalctl` or the production entrypoint;
+* write to, rename, unlink or relink anything under
+  `/mnt/bench/releases/dailymail`.
+
+An audit hook is used deliberately: there is no API to remove one, so unlike a
+fixture it cannot be dropped by the test it is protecting. The suite's own
+fixtures — temporary XDG directories, fixture credentials, the stubbed
+collector and SMTP, the blocked parking and route lookups — *shape* what a test
+sees; the boundary *forbids* what no test may do. Every run prints what it
+reached, and a refused access fails the run even if every test passed.
+
+`monkeypatch.undo()` is forbidden in a test body, and
+`tests/test_hermetic_boundary_regression.py` fails if it reappears. It reverts
+the whole scope's patch stack, including every autouse fixture's, so it can
+only ever remove more than the caller installed; a test that wants one patch to
+stop applying wants `monkeypatch.context()`. This is not theoretical — a
+`monkeypatch.undo()` in `test_a_calendar_failure_never_costs_the_digest` had
+the pipeline running against the operator's real state directory, the real
+Rowan endpoint and the real Gmail credentials, and was what ControlPanel's
+release gate refused to validate.
+
+The two opt-in live modules (`test_parking_live.py`, `test_visual_qa.py`) exist
+to make real requests and are exempted; they skip themselves unless their own
+environment flag is set.
 
 ---
 

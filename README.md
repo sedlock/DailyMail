@@ -24,7 +24,7 @@ approver metadata, and a direct link to the official Rowan page for verification
 
 ```sh
 uv sync
-uv run pytest                      # 972 tests, no network required
+uv run pytest                      # 991 tests, no network required
 
 uv run dailymail run-daily         # the full pipeline for today
 uv run dailymail status            # runs, deliveries, timer state
@@ -68,6 +68,14 @@ browser:
 DAILYMAIL_LIVE_PARKING=1 uv run pytest tests/test_parking_live.py
 DAILYMAIL_VISUAL_QA=1    uv run pytest tests/test_visual_qa.py
 ```
+
+"No network required" is enforced, not intended. `tests/hermetic_boundary.py`
+installs a CPython audit hook — which, unlike a fixture, has no uninstall — and
+refuses any attempt to resolve Rowan's host, speak SMTP, read the real
+credentials, touch the production database, state directory or run lock,
+invoke systemd, or mutate the immutable release. Every run prints what it
+reached, and a refused access fails the run. `docs/operations.md` §11 has the
+rules, including why `monkeypatch.undo()` is forbidden in a test body.
 
 Operational reference — commands, exit codes, failure behaviour, troubleshooting:
 **`docs/operations.md`**. Parking geography, sources and cache:

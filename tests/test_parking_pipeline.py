@@ -16,6 +16,11 @@ from dailymail import cli, daily, db, mailer, parking_enrich, parking_refresh, p
 
 from conftest import TARGET_DATE, OfflineParkingFetcher, artifact_from_fixtures, stub_description_runner
 
+# Captured at import, before any fixture has patched the module attribute: the
+# genuine production entry point, for the one test that has to call it rather
+# than the offline delegate `parked_pipeline` installs over it.
+REAL_PARKING_ENRICH = parking_enrich.enrich_digest
+
 
 @pytest.fixture
 def parked_pipeline(monkeypatch, settings_obj, employee_fixture, student_fixture):
@@ -236,22 +241,31 @@ def test_a_parking_failure_still_delivers_a_complete_digest(
     def broken(connection, rows, **kwargs):
         raise RuntimeError("parking subsystem is on fire")
 
-    monkeypatch.setattr(daily.parking_enrich, "enrich_digest", broken)
-    with pytest.raises(RuntimeError):
-        daily.run_daily(target_date=TARGET_DATE, settings=settings_obj)
+    # A bounded patch scope. This test used to install `broken` on the shared
+    # `monkeypatch` and then call `monkeypatch.undo()` to get rid of it, which
+    # also discarded `parked_pipeline`'s stubs and `conftest`'s autouse
+    # protections -- so the `db.connect()` below opened the operator's real
+    # production database and `db.initialize` migrated it. See
+    # `tests/hermetic_boundary.py`.
+    with monkeypatch.context() as broken_entry_point:
+        broken_entry_point.setattr(daily.parking_enrich, "enrich_digest", broken)
+        with pytest.raises(RuntimeError):
+            daily.run_daily(target_date=TARGET_DATE, settings=settings_obj)
 
     # The pipeline itself must not swallow a programming error, but the real
-    # entry point never raises: verify that directly.
-    monkeypatch.undo()
+    # entry point never raises: verify that directly. `REAL_PARKING_ENRICH` is
+    # captured at import, so this is genuinely the unwrapped production
+    # function and not the fixture's offline delegate.
     connection = db.connect()
     db.initialize(connection)
     try:
-        callouts, metrics = parking_enrich.enrich_digest(
+        callouts, metrics = REAL_PARKING_ENRICH(
             connection, [], target_date=TARGET_DATE, settings=settings_obj
         )
     finally:
         connection.close()
     assert callouts == {}
+    assert metrics.errors == []
 
 
 def test_a_parking_source_outage_does_not_alert_or_fail(

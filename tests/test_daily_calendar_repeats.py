@@ -12,7 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from conftest import TARGET_DATE, artifact_from_fixtures
+from conftest import (
+    KNOWN_NEW_SUBJECTS_2026_08_20,
+    TARGET_DATE,
+    artifact_from_fixtures,
+)
 from dailymail import calendar_enrich, daily, db, mailer, render, travel
 
 
@@ -100,24 +104,96 @@ def test_the_source_body_is_never_modified_by_the_new_subsystems(
 def test_a_calendar_failure_never_costs_the_digest(
     pipeline, settings_obj, monkeypatch
 ):
-    monkeypatch.setattr(
-        daily.calendar_enrich, "enrich_digest",
-        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("calendar exploded")),
-    )
-    with pytest.raises(RuntimeError):
-        daily.run_daily(target_date=TARGET_DATE, settings=settings_obj)
-    # The orchestration deliberately does not swallow a programming error, but
-    # every *expected* failure inside enrichment is contained -- proven by
-    # replacing the internals rather than the entry point.
-    monkeypatch.undo()
+    """An enrichment failure costs the button, and nothing else.
 
+    Two halves, and they need opposite things from `enrich_digest`. The first
+    replaces the entry point to show the orchestration does not swallow a
+    programming error; the second needs the real entry point back so that a
+    failure *inside* it is genuinely contained.
+
+    Getting the real one back is what `monkeypatch.context()` is for. This test
+    used to call `monkeypatch.undo()` instead, which is not a narrower or a
+    wider version of the same thing -- it is a different operation. A
+    `monkeypatch` instance is shared by every fixture in the test's scope, so
+    `undo()` also discarded the `pipeline` stubs and `conftest`'s autouse
+    protections, and the second `run_daily` below ran against the operator's
+    real state directory, the real Rowan endpoint and the real Gmail
+    credentials. See `tests/hermetic_boundary.py`.
+    """
+    real_enrich_digest = calendar_enrich.enrich_digest
+
+    with monkeypatch.context() as broken_entry_point:
+        broken_entry_point.setattr(
+            daily.calendar_enrich, "enrich_digest",
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError("calendar exploded")),
+        )
+        with pytest.raises(RuntimeError):
+            daily.run_daily(target_date=TARGET_DATE, settings=settings_obj)
+
+    # Exactly one attribute came back, and it is the one that was replaced.
+    assert calendar_enrich.enrich_digest is real_enrich_digest
+    assert daily.collector.run_collection.__qualname__.startswith("pipeline")
+
+    # Relevance is decided before an action is built, and the deterministic
+    # fallback the `pipeline` fixture installs withholds this day's only
+    # candidate -- so with that stub in place `build_action_url` is never
+    # reached and the containment claim would be vacuous. Curation has to
+    # actually want the button for its construction to be able to fail.
+    def curation_that_wants_the_calendar(rows, target_date, settings, **kwargs):
+        entries = daily.curate.fallback_rank(rows, target_date, settings)
+        for entry in entries:
+            entry["calendar"] = {
+                "offer": True, "confidence": 0.95, "reason": "relevant to the reader",
+            }
+        return daily.curate.CurationOutcome(
+            method="claude", model="sonnet", entries=entries,
+        )
+
+    monkeypatch.setattr(daily.curate, "curate", curation_that_wants_the_calendar)
+
+    # Every *expected* failure inside enrichment is contained -- proven by
+    # replacing the internals rather than the entry point. `build_action_url`
+    # is called from `_build_one`, which is the layer the containment sits on.
     monkeypatch.setattr(
         calendar_enrich.calendar_action, "build_action_url",
         lambda *a, **k: (_ for _ in ()).throw(ValueError("nope")),
     )
     result = daily.run_daily(target_date=TARGET_DATE, settings=settings_obj)
+
+    # The digest is produced, delivered, and complete.
     assert result.status == "success"
     assert result.email_status in ("sent", "skipped_duplicate")
+    assert result.counts["unique"] == 13
+    assert result.counts["new"] + result.counts["standing"] == 13
+
+    # The failure really did happen at the intended layer, and cost only the
+    # optional action.
+    assert result.calendar["candidates"] > 0
+    assert result.calendar["build_failures"] > 0
+    assert result.calendar["offered"] == 0
+    assert result.calendar["session_actions"] == 0
+
+    # And the reader still got every announcement, with no calendar attachment.
+    prepared = pipeline[-1]
+    assert prepared.calendar_count == 0
+    body = _plain_text(prepared)
+    for subject in KNOWN_NEW_SUBJECTS_2026_08_20:
+        assert subject in body
+
+    # The announcement whose action failed is still recorded, as withheld
+    # rather than as missing: an audit trail with a hole in it would hide
+    # exactly this class of failure.
+    connection = db.connect()
+    try:
+        stored = db.calendar_recommendations(connection, TARGET_DATE)
+        assert len(stored) == result.counts["unique"]
+        withheld = [
+            row for row in stored
+            if (row["withheld_reason"] or "").startswith("build_error")
+        ]
+        assert len(withheld) == result.calendar["build_failures"]
+    finally:
+        connection.close()
 
 
 def test_a_calendar_failure_never_sends_an_operator_alert(

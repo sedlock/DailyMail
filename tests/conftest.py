@@ -2,6 +2,13 @@
 
 Tests run entirely against the sanitized Phase 0 fixtures and a mock HTTP
 transport. Nothing here touches the live Rowan service.
+
+Two layers, deliberately different in kind. The fixtures below *shape* what a
+test sees -- temporary XDG directories, fixture credentials, a stubbed
+collector, blocked parking and route lookups. `hermetic_boundary` separately
+*forbids* what no test may do, as a CPython audit hook that cannot be undone by
+anything, including `monkeypatch.undo()`. See that module for why the
+distinction turned out to matter.
 """
 
 from __future__ import annotations
@@ -12,6 +19,12 @@ from pathlib import Path
 
 import httpx
 import pytest
+
+import hermetic_boundary
+
+# Installed at import, before collection: the boundary has to already exist by
+# the time the first test body runs, and there is no way to remove it after.
+hermetic_boundary.install()
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = REPO_ROOT / "artifacts" / "reconnaissance" / "fixtures"
@@ -38,6 +51,28 @@ EXPECTED_STANDING_IDS_2026_08_20 = {
 MOCK_MODULE_VERSION = "MOCKmoduleVersion00000"
 MOCK_API_VERSION = "MOCKapiVersion0000000"
 MOCK_CSRF = "MOCKcsrfToken00000000="
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_protocol(item, nextitem):
+    """Refuse real egress for the whole normal suite; relax it only for probes.
+
+    A hook rather than an autouse fixture, because it has to wrap the item's
+    *whole* protocol. An autouse fixture is function-scoped, and higher-scoped
+    fixtures are set up before it runs -- so `test_parking_live.py`'s
+    module-scoped `fetched` fixture, whose entire job is to make live requests,
+    was fetching before the relaxation had been entered.
+
+    The boundary itself is process-wide and permanent; this only names the
+    current test in a refusal message, and steps aside for the two modules
+    documented as opt-in live probes, which skip themselves anyway unless their
+    own environment flag is set.
+    """
+    hermetic_boundary.enter_test(item.nodeid)
+    if item.path.name in hermetic_boundary.OPT_IN_LIVE_MODULES:
+        with hermetic_boundary.relaxed():
+            return (yield)
+    return (yield)
 
 
 @pytest.fixture(autouse=True)
@@ -674,3 +709,47 @@ def regression_record(submission_id: str, **overrides) -> dict:
     }
     record.update(overrides)
     return record
+
+
+# --- boundary reporting -------------------------------------------------------
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Say out loud what the run did and did not reach.
+
+    An empty violation list is the run's own evidence for the three numbers an
+    operator cares about: real external connections, real SMTP attempts and
+    real production credential reads, all zero.
+    """
+    summary = hermetic_boundary.summary()
+    terminalreporter.section("hermetic boundary")
+    if not summary["installed"]:  # pragma: no cover - cannot happen via conftest
+        terminalreporter.write_line("NOT INSTALLED", red=True)
+        return
+    violations = summary["violations"]
+    if violations:
+        terminalreporter.write_line(
+            f"{len(violations)} real-access attempt(s) refused:", red=True
+        )
+        for entry in violations:
+            terminalreporter.write_line(
+                f"  {entry['kind']}: {entry['detail']}  [{entry['test']}]", red=True
+            )
+        return
+    terminalreporter.write_line(
+        "0 external connections, 0 SMTP attempts, 0 production credential reads, "
+        f"0 production state accesses ({summary['probes_blocked']} deliberate "
+        "boundary probe(s) refused as designed)"
+    )
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """A refused real access fails the run, even if every test passed.
+
+    The refusal already broke the test that attempted it, so this is belt and
+    braces -- except in the one case that matters most: an attempt made inside
+    code that catches broad exceptions, where the test could still pass with
+    the boundary having quietly saved it.
+    """
+    if hermetic_boundary.VIOLATIONS and exitstatus == 0:
+        session.exitstatus = 1
