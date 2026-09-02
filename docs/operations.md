@@ -101,8 +101,79 @@ systemctl --user enable --now dailymail.timer    # resume scheduling
 
 ### Deployment, remediation and rollback contract
 
-For a DailyMail code deployment or a ControlPanel-approved remediation, run the
-checked-in installer from the canonical checkout:
+Development happens in this repository. Production activation happens through
+ControlPanel's registered immutable release interface, and `dailymail.timer`
+executes whatever release ControlPanel currently marks `current`:
+
+    WorkingDirectory=/mnt/bench/releases/dailymail/current/src
+    ExecStart=/mnt/bench/releases/dailymail/current/.venv/bin/dailymail run-daily --trigger timer
+
+`current` is the controlled indirection. A new activation never edits the timer
+and never points the unit at a commit-specific path; ControlPanel moves the
+symlink and reloads the fixed drop-in. Nothing about the 06:30 America/New_York
+schedule changes.
+
+**Production does not execute this checkout.** `/mnt/bench/src/DailyMail` is
+development and documentation evidence. Running `./scripts/install.sh` here
+syncs the local environment and rewrites the unit files; it does not change the
+code production runs.
+
+#### Handing a finished commit to ControlPanel
+
+```sh
+git -C /mnt/bench/src/DailyMail rev-parse HEAD
+controlpanel release validate-commit --target dailymail --commit <40-char-sha>
+controlpanel release build-activate  --target dailymail \
+    --commit <40-char-sha> --source dailymail-development
+```
+
+ControlPanel owns everything after the SHA. It proves the value is a full,
+unambiguous 40-character commit object in *this* registered repository — an
+abbreviation, a branch name or a tag is refused rather than guessed at —
+extracts exactly that object with `git archive` and verifies the extraction
+against `git ls-tree`, so no uncommitted change, staged edit or untracked file
+can reach production however dirty the working tree is at the time. It then runs
+the registered validation over that sealed extraction inside a no-network
+sandbox, refuses to proceed if `dailymail.service` is already executing, builds
+the immutable artifact, activates it, and verifies that the unit resolves
+through `current`, that `dailymail health --json` passes from the activated
+release, and that no unit entered execution.
+
+Validation is code and build validation only. It never starts
+`dailymail.service` and never invokes `run-daily`, so releasing a commit cannot
+contact Rowan or send a digest.
+
+There is nothing in that command to name a repository, a path, a branch, a build
+command, a unit, an executable, an installer or an environment: the target id
+resolves all of them from ControlPanel's server-owned registry.
+
+#### What ControlPanel records
+
+Each activation writes a durable receipt: the commit and tree, the artifact
+identity, the previous release, who asked, why (`dailymail-development`,
+`controlpanel-remediation`, `operator-manual` or `rollback`), and whether the
+commit was `ON_GITHUB_MAIN`, `ON_REMOTE_REF` or `LOCAL_ONLY` at the time. A
+local-only commit can be released through the development handoff, and is
+labelled as exactly that in ControlPanel's DailyMail Delivery view — the code
+running in production is then not recoverable from GitHub, which is a real
+development state worth knowing rather than a fault.
+
+#### Rollback
+
+```sh
+controlpanel release rollback --target dailymail
+```
+
+Restores the previous sealed release immediately, through the same activation
+service, and records `rollback`. Runtime recovery does not wait on GitHub.
+ControlPanel remediation additionally runs its own revert-PR lifecycle where its
+code-history policy requires one; that is a separate concern from getting
+production back.
+
+#### The installer, for bootstrap and development
+
+`./scripts/install.sh` remains available and is still the way to create the
+local environment and write the user units:
 
 ```sh
 cd /mnt/bench/src/DailyMail
@@ -154,17 +225,13 @@ sqlite3 ~/.local/share/dailymail/dailymail.sqlite3 \
 ```
 
 Do not copy only the live `.sqlite3` file while WAL is active. A code rollback
-uses the approved ControlPanel lifecycle: ControlPanel creates a dedicated
-revert branch from `main`, opens a reviewed revert PR, waits for required CI and
-review, and merges that PR into `main`. It is a code rollback, not a database
-rollback. Only after merged `main` is current locally, run the same
-no-business-job installer:
-
-```sh
-git -C /mnt/bench/src/DailyMail switch main
-git -C /mnt/bench/src/DailyMail pull --ff-only origin main
-cd /mnt/bench/src/DailyMail && ./scripts/install.sh
-```
+is a runtime operation first: `controlpanel release rollback --target dailymail`
+restores the previous sealed release and verifies it, without waiting on GitHub.
+It is a code rollback, not a database rollback. Where its code-history policy
+requires it, ControlPanel then runs its own revert lifecycle — a dedicated
+revert branch from `main`, a reviewed revert PR, required CI, and a merge — and
+activates the exact reverted commit through the same release interface. Syncing
+this checkout is not part of either path.
 
 Normal live verification is deliberately separate from installation. Starting
 `dailymail.service`, invoking `run-daily`, or enabling/starting a missed timer
