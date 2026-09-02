@@ -34,7 +34,35 @@ uv run dailymail parking-status    # the parking reference cache
 
 ## Deployment and ControlPanel remediation
 
-From the authoritative DailyMail checkout, use the narrow deployment contract:
+Development happens here. Production activation happens through ControlPanel.
+
+`dailymail.timer` executes whatever immutable release ControlPanel currently
+marks `current`, so a deployment is an activation, not a sync of this checkout:
+
+```sh
+/mnt/bench/releases/dailymail/current/.venv/bin/dailymail
+```
+
+When development is finished and validated, hand ControlPanel the exact commit:
+
+```sh
+git -C /mnt/bench/src/DailyMail rev-parse HEAD
+controlpanel release build-activate --target dailymail \
+    --commit <that-40-character-sha> --source dailymail-development
+```
+
+ControlPanel proves the SHA is a committed object in this repository, extracts
+exactly that object with `git archive` — so nothing uncommitted or untracked can
+reach production, whatever state the working tree is in — runs the registered
+validation over that extraction in a no-network sandbox, builds the immutable
+artifact, activates it, and verifies it. It records who asked, why, and whether
+the commit is on GitHub main. `controlpanel release validate-commit` runs the
+same gate on its own and changes nothing.
+
+`./scripts/install.sh` remains for **bootstrap and development**: it creates the
+local environment and writes the user units the timer needs. It is no longer the
+production deployment path, and syncing this checkout does not change what
+production runs.
 
 ```sh
 cd /mnt/bench/src/DailyMail
