@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time as _time
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -82,44 +83,166 @@ class CalendarMetrics:
 # Used when curation is unavailable, and as the floor under the model's
 # judgement. The weights encode the reader described in the curation system
 # prompt: a senior technology executive who is also a Rowan parent.
+#
+# The first version of this scorer searched one flat haystack -- title, whole
+# body, extracted title and location concatenated -- for every phrase it knew.
+# Two production results on 9 September 2026 showed why that is the wrong shape.
+#
+#   * 6815, `Hollybush Tour`, scored 0.85 and was offered because the word
+#     `president` appears in its history: "the University's history through the
+#     legacy of its presidents, and the 1967 summit between President Lyndon B.
+#     Johnson and Soviet Premier Alexei Kosygin". An ordinary building tour was
+#     promoted to a senior-leadership event by two sentences of prose about
+#     1967. (The tour is in fact worth offering -- but for its own reasons, and
+#     this scorer now reaches that conclusion without ever reading the word.)
+#   * 6783, `You're Invited to the Wellness Center Open House!`, scored 0.20 and
+#     was withheld, because `free food` deep in the body cost it 0.25 while
+#     `emergency` -- from "Emergency Medical Services" in a list of the
+#     departments attending -- gave back 0.25. A broad student-service open
+#     house with a date, a time and a room lost its button to two incidental
+#     phrases neither of which describes the event.
+#
+# So relevance now reasons from what the event *is*, in this order:
+#
+#   1. the event title (extracted title, announcement subject, heading)
+#   2. the Rowan category
+#   3. the audience it was published to
+#   4. the announcement's own opening -- where it states its purpose
+#   5. breadth: is this for everybody, or for a particular few?
+#   6. role relevance to this reader
+#
+# Body prose beyond the opening is *supporting evidence only*: it is scored at a
+# quarter weight and its total contribution is clamped to +/- BODY_INFLUENCE_CAP,
+# so no amount of incidental wording can carry an event over the threshold or
+# push a genuine one under it. The signals that identify *who* an event belongs
+# to -- president, provost, town hall -- are focus-only and are never read out of
+# body prose at all, which is exactly the Hollybush defect.
 
-_STRONG_SIGNALS = (
-    ("town hall", 0.45), ("provost", 0.40), ("president", 0.40),
-    ("chancellor", 0.40), ("cabinet", 0.35), ("board of trustees", 0.35),
-    ("state of the university", 0.40), ("commencement", 0.40),
-    ("convocation", 0.30), ("cybersecurity", 0.40), ("information security", 0.35),
-    ("data security", 0.30), ("enterprise system", 0.35), ("banner", 0.25),
-    ("erp", 0.25), ("migration", 0.20), ("policy", 0.20), ("governance", 0.25),
-    ("strategic plan", 0.30), ("budget", 0.25), ("open enrollment", 0.35),
-    ("benefits", 0.20), ("move-in", 0.30), ("move in", 0.30),
-    ("family weekend", 0.30), ("parents", 0.25), ("registration", 0.20),
-    ("accreditation", 0.30), ("emergency", 0.25), ("safety", 0.20),
-    ("briefing", 0.25), ("leadership", 0.25), ("all-employee", 0.35),
-    ("all employees", 0.35), ("faculty and staff", 0.20), ("research", 0.15),
-    ("artificial intelligence", 0.25), ("ai ", 0.15), ("information technology", 0.30),
+# Evidence is graded by where it sits, because where a phrase appears says how
+# much it is claiming about the event. In the title it *is* the event; in the
+# opening sentences it is part of how the announcement describes itself; further
+# down it is a detail. "FREE FOOD!" in 6927's subject is the event. The same
+# words in 6783's list of what is on offer are not.
+IDENTITY_INFLUENCE_WEIGHT = 1.0
+PURPOSE_INFLUENCE_WEIGHT = 0.5
+BODY_INFLUENCE_WEIGHT = 0.25
+# How much the body below the opening may move a score in either direction.
+BODY_INFLUENCE_CAP = 0.10
+# How much of the announcement counts as its own statement of purpose.
+PURPOSE_CHARS = 260
+# Ceilings, so a title that happens to hit several phrases cannot run away.
+FOCUS_TOPIC_CAP = 0.40
+ROUTINE_PENALTY_CAP = -0.60
+BREADTH_CAP = 0.25
+BASE_SCORE = 0.30
+
+# Who the event belongs to. FOCUS ONLY: these are read from the title, the
+# extracted event title and the announcement's own heading, never from body
+# prose, because a historical mention of a president does not make a tour a
+# leadership event.
+_IDENTITY_SIGNALS = (
+    ("town hall", 0.40), ("provost", 0.35), ("president", 0.35),
+    ("chancellor", 0.35), ("cabinet", 0.30), ("board of trustees", 0.35),
+    ("state of the university", 0.40), ("dean s", 0.15), ("trustee", 0.25),
+    ("inauguration", 0.30), ("commencement", 0.40), ("convocation", 0.25),
 )
 
-_WEAK_SIGNALS = (
-    ("club", -0.30), ("intramural", -0.30), ("trivia", -0.35), ("karaoke", -0.35),
-    ("bingo", -0.35), ("game night", -0.35), ("tailgate", -0.25),
-    ("student organization", -0.25), ("greek life", -0.30), ("sorority", -0.35),
-    ("fraternity", -0.35), ("shuttle", -0.20), ("free food", -0.25),
-    ("giveaway", -0.30), ("merchandise", -0.30), ("planetarium", -0.25),
-    ("swim lesson", -0.35), ("intramurals", -0.30), ("welcome week", -0.20),
-    ("student center patio", -0.15), ("open mic", -0.35), ("movie night", -0.35),
+# What the event is about. Read from the focus text: title, extracted title,
+# heading, location and the announcement's opening statement of purpose.
+_TOPIC_SIGNALS = (
+    # technology and enterprise systems
+    ("cybersecurity", 0.40), ("information security", 0.35), ("data security", 0.30),
+    ("enterprise system", 0.35), ("information technology", 0.30), ("banner", 0.25),
+    ("erp", 0.25), ("artificial intelligence", 0.25), ("system migration", 0.25),
+    ("outage", 0.30), ("phishing", 0.25),
+    # institutional operations and policy
+    ("accreditation", 0.30), ("strategic plan", 0.30), ("open enrollment", 0.35),
+    ("budget", 0.25), ("payroll", 0.25), ("governance", 0.25), ("policy", 0.20),
+    ("benefits", 0.20), ("briefing", 0.25), ("summit", 0.20),
+    # safety
+    ("emergency", 0.25), ("public safety", 0.25), ("safety", 0.20),
+    ("active shooter", 0.35), ("severe weather", 0.25),
+    # broad campus and community occasions
+    ("open house", 0.20), ("memorial", 0.20), ("anniversary", 0.10),
+    ("ribbon cutting", 0.25), ("groundbreaking", 0.25), ("dedication", 0.15),
+    # student and parent logistics
+    ("move in", 0.30), ("family weekend", 0.30), ("parents", 0.25),
+    ("orientation", 0.25), ("financial aid", 0.25), ("commencement", 0.40),
+    # broad student services a parent cares about
+    ("wellness", 0.20), ("health services", 0.25), ("counseling", 0.20),
+    ("counselling", 0.20), ("student health", 0.25),
+)
+
+# Routine, narrow or promotional. Scored on the focus text, where an
+# announcement says what it is; `FREE FOOD!` in a subject is the event, the same
+# words in a list of refreshments are not.
+_ROUTINE_SIGNALS = (
+    ("general body meeting", 0.35), ("interest meeting", 0.30), ("club", 0.30),
+    ("intramural", 0.30), ("trivia", 0.35), ("karaoke", 0.35), ("bingo", 0.35),
+    ("game night", 0.35), ("movie night", 0.35), ("open mic", 0.35),
+    ("late night", 0.30), ("tailgate", 0.25), ("greek life", 0.30),
+    ("sorority", 0.35), ("fraternity", 0.35), ("giveaway", 0.25),
+    ("merchandise", 0.25), ("planetarium", 0.25), ("swim lesson", 0.35),
+    ("welcome week", 0.20), ("beach day", 0.30), ("off campus trip", 0.25),
+    ("free food", 0.25), ("happy hour", 0.25), ("mixer", 0.25),
+    ("student led", 0.20), ("book club", 0.30), ("drop in", 0.20),
+    ("info session", 0.20), ("information session", 0.20),
+    ("resume review", 0.25), ("breakfast", 0.15), ("cookout", 0.25),
+    ("bbq", 0.25), ("ticket", 0.15), ("audition", 0.25), ("open skate", 0.30),
+)
+
+# Explicit breadth, read from the focus text.
+_BREADTH_SIGNALS = (
+    ("all employees", 0.20), ("all faculty", 0.15), ("all staff", 0.15),
+    ("faculty and staff", 0.15), ("university community", 0.20),
+    ("entire rowan", 0.20), ("campus wide", 0.20), ("campus community", 0.15),
+    ("open to all", 0.15), ("all are welcome", 0.15), ("everyone", 0.10),
 )
 
 # Rowan categories whose events are, on their own, likely to matter here.
 _STRONG_CATEGORIES = {
-    "Official": 0.35, "Technology": 0.35, "Public Safety": 0.25,
-    "Human Resources": 0.25, "Facilities": 0.20, "Glassboro Campus": 0.15,
-    "Finance": 0.20, "Registrar": 0.20, "Research": 0.10,
+    "Official": 0.30, "Technology": 0.30, "Public Safety": 0.25,
+    "Human Resources": 0.25, "Facilities": 0.20, "Glassboro Campus": 0.20,
+    "Finance": 0.20, "Registrar": 0.20, "Well-being and Health": 0.20,
+    "Research": 0.10, "Faculty": 0.10, "Academics": 0.05,
+    "Academic and Career Success": 0.05,
 }
 _WEAK_CATEGORIES = {
-    "Athletic Events": -0.30, "Clubs and Organizations": -0.35,
+    "Athletic Events": -0.25, "Clubs and Organizations": -0.30,
     "Campus Activities": -0.25, "Social and Cultural Events": -0.20,
     "Our Stories!": -0.25, "Volunteer Opportunities": -0.15,
 }
+
+# Audience, as published by Rowan. `Both` is the broadest thing the source can
+# say, and a student-only event is no longer penalised for being student-only --
+# a parent-relevant student service is exactly the kind of thing this reader
+# wants. Narrowness is expressed by the routine signals instead.
+_AUDIENCE_WEIGHTS = {"Both": 0.10, "Employees": 0.05, "Students": 0.0}
+# An announcement published to everyone, carrying no routine or narrowing marker
+# at all, is broadly applicable by construction.
+_BROAD_AUDIENCE_BONUS = 0.05
+
+_MATCH_NORMALIZE = re.compile(r"[^a-z0-9]+")
+
+
+def _normalize_for_match(text: str) -> str:
+    """Lowercase, and reduce every run of punctuation or space to one space.
+
+    So `Drop- In`, `drop-in` and `Drop In` are the same phrase, and a table's
+    worth of curly quotes and emoji cannot hide one.
+    """
+    return f" {_MATCH_NORMALIZE.sub(' ', (text or '').lower()).strip()} "
+
+
+def _hits(haystack: str, signals, *, scale: float = 1.0):
+    """Every matching phrase and its weight, at `scale` of its listed value."""
+    for phrase, weight in signals:
+        if f" {phrase} " in haystack:
+            yield phrase, weight * scale
+
+
+def _capped(total: float, cap: float) -> float:
+    return min(total, cap) if cap >= 0 else max(total, cap)
 
 
 def deterministic_relevance(row, candidate) -> tuple[float, str]:
@@ -127,40 +250,99 @@ def deterministic_relevance(row, candidate) -> tuple[float, str]:
 
     Deliberately conservative: the base sits below the default threshold, so an
     event has to earn its button rather than merely fail to disqualify itself.
+    The returned reason names every signal that moved the score and marks the
+    ones that came from body prose, so the audit row shows not just what was
+    decided but from which part of the announcement.
     """
-    haystack = " ".join(
-        str(part or "").lower()
-        for part in (
-            _value(row, "title"), _value(row, "body_text"), candidate.title,
-            candidate.location,
+    body = str(_value(row, "body_text") or "")
+    purpose = body[:PURPOSE_CHARS]
+    remainder = body[PURPOSE_CHARS:]
+
+    # What the event IS: its names, its place, and its own opening sentences.
+    identity_text = _normalize_for_match(
+        " ".join(
+            str(part or "")
+            for part in (
+                _value(row, "title"),
+                candidate.title,
+                getattr(candidate, "heading_hint", None),
+                candidate.location,
+                getattr(candidate, "audience", None),
+            )
         )
     )
-    score = 0.30
+    purpose_text = _normalize_for_match(purpose)
+    body_text = _normalize_for_match(remainder)
+
+    score = BASE_SCORE
     hits: list[str] = []
 
-    for phrase, weight in _STRONG_SIGNALS:
-        if phrase in haystack:
-            score += weight
-            hits.append(phrase)
-    for phrase, weight in _WEAK_SIGNALS:
-        if phrase in haystack:
-            score += weight
-            hits.append(f"-{phrase}")
+    def graded(signals):
+        """Every match, once, at the weight of the strongest place it appears."""
+        for phrase, weight in signals:
+            for text, scale, label in (
+                (identity_text, IDENTITY_INFLUENCE_WEIGHT, ""),
+                (purpose_text, PURPOSE_INFLUENCE_WEIGHT, "purpose:"),
+            ):
+                if f" {phrase} " in text:
+                    yield phrase, weight * scale, label
+                    break
 
+    # 1-2. who the event belongs to, and what it is about.
+    topic_total = 0.0
+    for phrase, weight in _hits(identity_text, _IDENTITY_SIGNALS):
+        topic_total += weight
+        hits.append(phrase)
+    for phrase, weight, label in graded(_TOPIC_SIGNALS):
+        topic_total += weight
+        hits.append(f"{label}{phrase}")
+    score += _capped(topic_total, FOCUS_TOPIC_CAP)
+
+    # 3. routine / narrow markers, graded the same way.
+    routine_total = 0.0
+    for phrase, weight, label in graded(_ROUTINE_SIGNALS):
+        routine_total -= weight
+        hits.append(f"-{label}{phrase}")
+    score += _capped(routine_total, ROUTINE_PENALTY_CAP)
+
+    # 4. breadth: who is this for?
+    audience = _value(row, "source_audience")
+    breadth_total = _AUDIENCE_WEIGHTS.get(audience, 0.0)
+    if audience == "Both" and not routine_total:
+        breadth_total += _BROAD_AUDIENCE_BONUS
+        hits.append("broad audience")
+    for phrase, weight, label in graded(_BREADTH_SIGNALS):
+        breadth_total += weight
+        hits.append(f"{label}{phrase}")
+    score += _capped(breadth_total, BREADTH_CAP)
+
+    # 5. the Rowan category, which is the source's own statement of kind.
     category = _value(row, "category_title") or ""
     score += _STRONG_CATEGORIES.get(category, 0.0)
     score += _WEAK_CATEGORIES.get(category, 0.0)
     if category in _STRONG_CATEGORIES or category in _WEAK_CATEGORIES:
         hits.append(f"category:{category}")
 
-    audience = _value(row, "source_audience")
-    if audience == "Employees":
-        score += 0.05
-    elif audience == "Students":
-        score -= 0.10
+    # 6. the rest of the body: supporting evidence, and clamped so that it can
+    #    never be the reason an event does or does not get a button.
+    body_total = 0.0
+    body_hits: list[str] = []
+    for phrase, weight in _hits(
+        body_text, _TOPIC_SIGNALS, scale=BODY_INFLUENCE_WEIGHT
+    ):
+        body_total += weight
+        body_hits.append(f"body:{phrase}")
+    for phrase, weight in _hits(
+        body_text, _ROUTINE_SIGNALS, scale=BODY_INFLUENCE_WEIGHT
+    ):
+        body_total -= weight
+        body_hits.append(f"body:-{phrase}")
+    body_total = max(-BODY_INFLUENCE_CAP, min(BODY_INFLUENCE_CAP, body_total))
+    score += body_total
+    hits.extend(body_hits)
 
     score = max(0.0, min(1.0, score))
-    detail = ", ".join(hits[:6]) or "no distinguishing signal"
+    detail = ", ".join(hits[:8]) or "no distinguishing signal"
     return score, f"deterministic relevance {score:.2f} ({detail})"
 
 
@@ -243,11 +425,19 @@ def enrich_digest(
     curation_model: str | None = None,
     allow_routing: bool = True,
     router=None,
+    persist: bool = True,
 ) -> tuple[dict[str, calendar_action.CalendarAction], CalendarMetrics]:
     """Turn detected candidates into validated calendar actions.
 
     Returns `{submission_id: CalendarAction}` plus counters. Never raises: this
     is enrichment, and a digest without a calendar button is a working digest.
+
+    `persist=False` computes the actions without writing
+    `calendar_recommendations`. That is what a *preview* wants: the stored rows
+    are the audit trail of what a given morning's run actually decided, and
+    re-rendering a past date months later under changed code must not overwrite
+    them with what today's code would have decided. `dailymail render` learned
+    this the hard way while validating the Phase 6 relevance change.
     """
     started = _time.monotonic()
     metrics = CalendarMetrics()
@@ -332,11 +522,12 @@ def enrich_digest(
             if action.has_travel:
                 metrics.travel_enriched += 1
 
-    try:
-        db.save_calendar_recommendations(connection, target_date, records)
-    except Exception as exc:  # noqa: BLE001 - the audit trail is not the product
-        metrics.errors.append(f"persist: {type(exc).__name__}: {str(exc)[:160]}")
-        log.warning("could not persist calendar recommendations: %s", exc)
+    if persist:
+        try:
+            db.save_calendar_recommendations(connection, target_date, records)
+        except Exception as exc:  # noqa: BLE001 - the audit trail is not the product
+            metrics.errors.append(f"persist: {type(exc).__name__}: {str(exc)[:160]}")
+            log.warning("could not persist calendar recommendations: %s", exc)
 
     metrics.duration_seconds = _time.monotonic() - started
     return actions, metrics

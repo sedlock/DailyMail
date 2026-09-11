@@ -658,13 +658,22 @@ and no `rgb(...)` declaration should survive.
 
 ## 13. Known limitations
 
-* Curation costs roughly $0.20–0.25 per run at the default model and takes 60–95
-  seconds — the bulk of the daily runtime. Set `curation.enabled = false` in
-  `config.toml` to use the deterministic ordering for free.
+* Curation costs roughly $0.20–0.25 per run at the default model and takes
+  16–240 seconds, with a median near 90 — the bulk of the daily runtime. The
+  timeout is `420` seconds, raised from 240 after 9 September 2026, when a
+  working call was killed at 240.07 s against an observed maximum successful run
+  of 237.0 s. Set `curation.enabled = false` in `config.toml` to use the
+  deterministic ordering for free.
 * Rowan uses `00:00:00` to mean "no event time", so a genuine midnight event is
   indistinguishable from an absent one.
-* `ExtraEdition` has never been observed true. It is stored so a special edition
-  becomes visible if one ever appears, but its delivery path is unverified.
+* `ExtraEdition` has never been observed true, and Phase 6 established why: an
+  Extra Edition bypasses `ActionGetHomeData` altogether, and its only read path
+  needs a `SuperAdmin2` role. Rowan's Extra Edition of 31 August 2026 is a
+  confirmed, documented coverage gap that closing would require a new ingestion
+  channel. The flag is still collected, surfaced as
+  `metrics.database_extra_editions` in `dailymail health --json`, and wired end
+  to end -- badge, curation priority, fallback ordering -- so the day Rowan sets
+  it, nothing needs writing. `docs/extra-editions.md`.
 * If Rowan edits an announcement's distribution dates after publication, the
   derived `New`/`Standing` status can shift between runs. `first_distribution_date`
   is stored so this is detectable.

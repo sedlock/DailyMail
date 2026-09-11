@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -69,16 +70,47 @@ def test_the_fixture_set_covers_every_reported_rendering_case():
         "color-control",
         "multi-session",
         "single-session-control",
+        "justify-leak",
+        "justify-control",
+        "calendar-broad-service",
+        "calendar-institutional",
+        "parking-callout",
     }
     by_id = {str(entry["submission_id"]): entry for entry in doc["announcements"]}
     # The exact production markup that caused the peach card.
     assert "color:rgb(90,19,0)" in by_id["6612"]["full_body"]
     # The control carries no colour declaration at all.
     assert "color:" not in by_id["6736"]["full_body"]
+    # The exact production markup that justified every paragraph...
+    assert "text-align:justify" in by_id["6846"]["full_body"].replace(" ", "")
+    # ...and the control that carries no alignment at all.
+    assert "text-align" not in by_id["6926"]["full_body"]
     # No contact block, and no address that could identify a person.
+    # No contact block, and every address either removed outright or replaced
+    # with the reserved, non-routable `example.invalid` sentinel.
+    address = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
     for entry in doc["announcements"]:
         assert "contact_email" not in entry
-        assert "@rowan.edu" not in entry["full_body"]
+        for field in ("full_body", "body_text"):
+            assert "@rowan.edu" not in entry[field]
+            survivors = [
+                found
+                for found in address.findall(entry[field])
+                if not found.endswith("@example.invalid")
+            ]
+            assert not survivors, (entry["submission_id"], survivors)
+
+
+def test_the_page_contains_both_a_new_and_a_standing_section():
+    """The New/Standing distinction cannot be measured on a page that has only
+    one of them."""
+    doc = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    statuses = {entry.get("status", "New") for entry in doc["announcements"]}
+    assert statuses == {"New", "Standing"}
+    assert any(entry.get("changed") for entry in doc["announcements"]), (
+        "one Standing card must be UPDATED, or the badge is never exercised"
+    )
+    assert any(entry.get("parking") for entry in doc["announcements"])
 
 
 def test_browser_invariants_hold_at_every_viewport(qa_page, tmp_path):
@@ -107,6 +139,47 @@ def test_browser_invariants_hold_at_every_viewport(qa_page, tmp_path):
     # Every viewport must actually have been exercised.
     for width in ("390x844", "430x932", "1280x900"):
         assert width in output or "invariant(s) held" in output
+
+
+def test_the_qa_suite_fails_when_the_alignment_policy_is_disabled(
+    tmp_path, settings_obj
+):
+    """A regression check that cannot fail is not a regression check.
+
+    Rebuilds the page with the render-time alignment policy switched off --
+    which is exactly the state production was in on 9 September -- and requires
+    the browser suite to reject it.
+    """
+    node = shutil.which("node")
+    assert node, "node is required for browser QA"
+
+    builder = (
+        "import sys, dataclasses;"
+        f"sys.path.insert(0, {str(REPO / 'src')!r});"
+        f"sys.path.insert(0, {str(REPO / 'tools' / 'qa')!r});"
+        "from dailymail import render;"
+        "render.BODY_ALIGNMENT_POLICY = dataclasses.replace("
+        "render.BODY_ALIGNMENT_POLICY, normalize=False);"
+        "import build_page;"
+        f"build_page.build(__import__('pathlib').Path({str(tmp_path / 'page')!r}))"
+    )
+    built = subprocess.run(
+        [sys.executable, "-c", builder],
+        capture_output=True, text=True, cwd=str(REPO), timeout=300,
+    )
+    assert built.returncode == 0, built.stdout + built.stderr
+
+    result = subprocess.run(
+        [node, str(QA_SCRIPT), "--page", str(tmp_path / "page"), "--screenshots-off"],
+        capture_output=True, text=True, cwd=str(REPO), timeout=600,
+    )
+    output = result.stdout + result.stderr
+    if result.returncode == 2:
+        pytest.skip(f"Playwright is not installed on this host:\n{output}")
+    assert result.returncode == 1, f"the QA suite accepted the known defect:\n{output}"
+    assert "no source justification survives" in output
+    # The exact announcement production shipped justified.
+    assert "6846" in output
 
 
 def test_the_qa_suite_fails_when_the_colour_policy_is_disabled(

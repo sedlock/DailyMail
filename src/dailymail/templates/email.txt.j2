@@ -15,7 +15,7 @@ NEW -- {{ counts.new }} announcement{{ '' if counts.new == 1 else 's' }}
 {{ group.category|upper }}
 {{ '-' * 72 }}
 {% for item in group.announcements %}
-[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %} | {{ item.audience_label }}]{% if item.show_category %} {{ item.category_title }}{% endif %}
+[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %}{% if item.extra_edition %} | EXTRA EDITION{% endif %} | {{ item.audience_label }}]{% if item.show_category %} {{ item.category_title }}{% endif %}
 
 {{ item.title }}
 {% if item.event %}
@@ -70,7 +70,7 @@ Official announcement: {{ item.official_url }}
 STANDING -- {{ counts.standing }} continuing announcement{{ '' if counts.standing == 1 else 's' }}
 {{ '=' * 72 }}
 {% for item in standing_items %}
-[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %} | {{ item.audience_label }}]{% if item.show_category %} {{ item.category_title }}{% endif %}
+[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %}{% if item.extra_edition %} | EXTRA EDITION{% endif %} | {{ item.audience_label }}]{% if item.show_category %} {{ item.category_title }}{% endif %}
 
 {{ item.title }}
 {% if item.event %}

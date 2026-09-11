@@ -1369,6 +1369,13 @@ def statistics(connection: sqlite3.Connection) -> dict:
         "display_status_corrections": scalar(
             "SELECT COUNT(*) FROM display_status_corrections"
         ),
+        # Rowan's own `ExtraEdition` flag, counted so the open question from
+        # Phase 0 U3 is answerable from the status document instead of from a
+        # hand-written query. It has been zero since collection began; see
+        # `docs/extra-editions.md` for what that does and does not mean.
+        "extra_editions": scalar(
+            "SELECT COUNT(*) FROM announcement_versions WHERE extra_edition = 1"
+        ),
     }
 
 

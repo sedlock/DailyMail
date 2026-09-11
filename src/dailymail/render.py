@@ -34,6 +34,20 @@ BODY_ACCENT = "#57150B"
 BODY_COLOR_POLICY = sanitize.BodyColorPolicy(
     body=BODY_INK, heading=BODY_ACCENT, link=BODY_ACCENT
 )
+# ...and the same boundary for alignment. An author's `text-align:justify`
+# reads as rivers of whitespace on a 390px Outlook mobile pane, so normal prose
+# is pinned left; table cells, figures and compact centred content keep theirs
+# (see `sanitize.BodyAlignmentPolicy`).
+BODY_ALIGNMENT_POLICY = sanitize.BodyAlignmentPolicy()
+
+
+def _value(row, key, default=None):
+    """Read a column that may not exist on every row shape."""
+    try:
+        value = row[key]
+    except (KeyError, IndexError, TypeError):
+        return default
+    return default if value is None else value
 
 
 @dataclass
@@ -135,8 +149,10 @@ def build_items(
             row["full_body"] or "",
             image_resolver=processor.resolver_for(submission_id, official_url),
             # Render-time only. The stored `full_body` keeps every source colour
-            # byte for byte; the digest imposes its own inside the card.
+            # and alignment byte for byte; the digest imposes its own inside the
+            # card.
             color_policy=BODY_COLOR_POLICY,
+            alignment_policy=BODY_ALIGNMENT_POLICY,
         )
         total_normalized += len(link_stats.normalized)
         total_dropped += link_stats.dropped
@@ -218,6 +234,13 @@ def build_items(
             "official_url": official_url,
             "status": row["status"],
             "changed": bool(row["changed"]),
+            # Rowan's own `ExtraEdition` boolean, and nothing else. An Extra
+            # Edition is an exceptional communication the university chose to
+            # send outside the normal daily mail, so it is worth marking -- but
+            # only when the *source* says so. Inferring one from wording such as
+            # "EXTRA EDITION" in a subject would let any submitter mint the
+            # badge, so the badge is exactly as trustworthy as the flag.
+            "extra_edition": bool(_value(row, "extra_edition")),
             "audience_label": AUDIENCE_LABELS.get(row["source_audience"], "EVERYONE"),
             "category_title": row["category_title"] or f"Category {row['category_id']}",
             "category_priority": (

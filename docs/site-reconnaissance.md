@@ -402,7 +402,7 @@ announcements with a 2026 distribution date.
 | `UpdatedByName` | string | 16.1% | |
 | `UpdatedById` | int | 16.1% | |
 | `OldSubmissionId` | int | 40 records total | Legacy import linkage |
-| `ExtraEdition` | bool | never true | Special-edition flag |
+| `ExtraEdition` | bool | never true | Special-edition flag. Still never true as of 11 Sep 2026 across 9,638 records; §13.3 |
 | `ExtraEditionDateSent` | datetime | never set | |
 | `IsDeleted` | bool | never true | Server filters deleted rows out |
 | `QuestionForApprover` | string | 2.5% | Workflow chatter, not content |
@@ -704,10 +704,19 @@ confirm the title/body match — but note this triggers Rowan's
 2. **`MaxRecords` upper bound / server-side cap is untested at scale.** 100,000
    worked on a 5,125-row range, but Rowan could add a cap later. Mitigation:
    always reconcile against `TotalCount` and page if short.
-3. **`ExtraEdition` semantics unverified.** The field and an
-   `ActionTest_DistributeExtraEditionByDate` endpoint exist, but `ExtraEdition`
-   was `false` for all 5,125 records. If Rowan issues a special edition, we do not
-   know whether it appears in `ActionGetHomeData` or bypasses it. Worth watching.
+3. ~~**`ExtraEdition` semantics unverified.**~~ **ANSWERED, 11 September 2026.**
+   Rowan issued an Extra Edition on 31 August 2026 (`A New Chapter for University
+   Advancement`, from the President). It appears **nowhere** in
+   `ActionGetHomeData` — not in single-day mode, not in range mode, and not in
+   the whole 2020-2030 archive, which by then was 5,372 employee and 4,266
+   student records with `ExtraEdition` false on every one and
+   `ExtraEditionDateSent` set on none. The only read path that knows about the
+   daily-mail distribution,
+   `MainFlow/EmailAdmin/DataActionGetDailyMailAnnouncements`, refuses an
+   anonymous caller with `NotRegisteredException: SuperAdmin2 role required`.
+   So an Extra Edition bypasses `ActionGetHomeData` entirely and there is no
+   deterministic public read source for one. Full evidence, and what DailyMail
+   does about it, in `docs/extra-editions.md`.
 4. **The API over-exposes PII.** Every record embeds a `User` object with
    `Username`, `External_Id` (9-digit Banner ID), `Last_Login`, and a `Password`
    key (empty in all observations), plus `SubmittedByExternalId`. **DailyMail must

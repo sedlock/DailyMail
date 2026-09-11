@@ -5,6 +5,13 @@
 {%- set INK = '#1a1a1a' -%}
 {%- set MUTED = '#6b6b6b' -%}
 {%- set RULE = '#dddddd' -%}
+{#- Standing announcements sit on their own slightly warmer neutral surface so
+    the reader can tell, several screens into a long scroll, which half of the
+    digest they are in. Deliberately a small step off white: enough for the eye
+    and for a computed-style assertion, not enough to look disabled. -#}
+{%- set STANDING_SURFACE = '#f4f2f1' -%}
+{%- set STANDING_RULE = '#e0dcd9' -%}
+{%- set STANDING_BAR = '#3a3a3a' -%}
 {%- set FONT = "-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif" -%}
 <!DOCTYPE html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -31,7 +38,14 @@
   }
   .body-copy img { max-width: 100% !important; height: auto !important; }
   .body-copy table { max-width: 100% !important; }
-  .body-copy { word-break: break-word; overflow-wrap: break-word; }
+  .body-copy { word-break: break-word; overflow-wrap: break-word; text-align: left; }
+  /* Belt to the render-time policy's braces. Every prose block is already
+     pinned inline (Outlook ignores this block entirely); an inline
+     text-align:center on deliberately compact content still wins here. */
+  .body-copy p, .body-copy div, .body-copy li, .body-copy blockquote,
+  .body-copy h1, .body-copy h2, .body-copy h3, .body-copy h4,
+  .body-copy h5, .body-copy h6, .body-copy dd, .body-copy dt { text-align: left; }
+  .card-meta, .card-meta div { text-align: left; }
   .body-copy a { word-break: break-all; }
   @media only screen and (max-width: 620px) {
     .shell { width: 100% !important; max-width: 100% !important; }
@@ -103,11 +117,22 @@
   {%- endif %}
 
   {#- ---------------- STANDING ---------------- -#}
+  {#- The section barrier. On a long Outlook-mobile scroll the old 7px grey bar
+      was easy to scroll straight past, so the crossing from today's new
+      information into continuing material is marked once, deliberately, with
+      the design's own vocabulary: breathing room, the gold accent rule the
+      header already uses, a heavier label, and a caption band naming what the
+      reader is about to enter. One barrier per digest, and none at all when
+      there is nothing standing. -#}
   {%- if standing_items %}
-  <tr><td style="padding:{{ '18px' if new_groups else '0' }} 0 0 0;">
+  <tr><td class="standing-transition" style="padding:{{ '26px' if new_groups else '0' }} 0 0 0;background:#ffffff;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr><td style="background:#4a4a4a;padding:7px 20px;font-family:{{ FONT }};font-size:13px;font-weight:bold;color:#ffffff;letter-spacing:1.5px;" class="pad">
-        STANDING <span style="color:#d8d8d8;font-weight:normal;letter-spacing:0.5px;">&nbsp;&mdash;&nbsp; {{ counts.standing }} continuing announcement{{ '' if counts.standing == 1 else 's' }}</span>
+      <tr><td style="background:{{ GOLD }};height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
+      <tr><td style="background:{{ STANDING_BAR }};padding:11px 20px 10px 20px;font-family:{{ FONT }};font-size:14px;font-weight:bold;color:#ffffff;letter-spacing:2px;" class="pad">
+        STANDING <span style="color:{{ GOLD }};font-weight:normal;letter-spacing:0.5px;">&nbsp;&mdash;&nbsp; {{ counts.standing }} continuing announcement{{ '' if counts.standing == 1 else 's' }}</span>
+      </td></tr>
+      <tr><td style="background:{{ STANDING_SURFACE }};border-bottom:1px solid {{ STANDING_RULE }};padding:6px 20px 7px 20px;font-family:{{ FONT }};font-size:11px;color:#5c5c5c;line-height:1.5;letter-spacing:0.2px;text-align:left;" class="pad">
+        Already sent to you before today. New information ends above.
       </td></tr>
     </table>
   </td></tr>

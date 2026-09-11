@@ -25,6 +25,7 @@ sys.path.insert(0, str(REPO / "src"))
 from dailymail import (  # noqa: E402
     calendar_enrich,
     db,
+    parking as parking_module,
     render,
     settings as settings_module,
 )
@@ -59,6 +60,7 @@ def _seed(connection, announcements: list[dict]) -> None:
                 is_active=True,
                 manual_priority=index + 1,
             )
+            status = entry.get("status") or "New"
             record = {
                 "submission_id": entry["submission_id"],
                 "title": entry["title"],
@@ -68,13 +70,14 @@ def _seed(connection, announcements: list[dict]) -> None:
                 "category_id": entry["category_id"],
                 "distribution_dates": [TARGET_DATE],
                 "first_distribution_date": TARGET_DATE,
-                "status": "New",
+                "status": status,
                 "is_event": entry.get("is_event") or 0,
                 "event_name": entry.get("event_name"),
                 "event_date": entry.get("event_date"),
                 "event_start_time": entry.get("event_start_time"),
                 "event_end_time": entry.get("event_end_time"),
                 "event_location": entry.get("event_location"),
+                "extra_edition": entry.get("extra_edition") or 0,
             }
             version_id, _ = db.record_announcement(
                 connection, record, observed_at=stamp
@@ -84,8 +87,8 @@ def _seed(connection, announcements: list[dict]) -> None:
                 target_date=TARGET_DATE,
                 submission_id=entry["submission_id"],
                 version_id=version_id,
-                status="New",
-                changed=False,
+                status=status,
+                changed=bool(entry.get("changed")),
                 observed_at=stamp,
             )
 
@@ -156,6 +159,16 @@ def build(out_dir: Path) -> dict:
             str(entry["submission_id"]): {"model_rank": index + 1}
             for index, entry in enumerate(announcements)
         }
+        # Parking callouts are supplied from the fixture rather than resolved,
+        # so the page exercises the callout markup without a database of lots
+        # and without a network call.
+        parking = {
+            str(entry["submission_id"]): [
+                parking_module.ParkingCallout(**spot) for spot in entry["parking"]
+            ]
+            for entry in announcements
+            if entry.get("parking")
+        }
         digest = render.render_digest(
             rows,
             target_date=TARGET_DATE,
@@ -163,6 +176,7 @@ def build(out_dir: Path) -> dict:
             ordering=ordering,
             curation_method="claude",
             settings=settings,
+            parking=parking,
             calendar=actions,
         )
     finally:
@@ -179,6 +193,8 @@ def build(out_dir: Path) -> dict:
         "html": html_path.name,
         "body_color": render.BODY_INK,
         "accent_color": render.BODY_ACCENT,
+        "counts": {"new": counts["new"], "standing": counts["standing"]},
+        "parking_callouts": digest.parking_callouts,
         "calendar": {
             "actions": metrics.actions_offered,
             "session_actions": metrics.session_actions_offered,
@@ -189,6 +205,9 @@ def build(out_dir: Path) -> dict:
                 "submission_id": str(entry["submission_id"]),
                 "kind": entry["kind"],
                 "why": entry["why"],
+                "status": entry.get("status") or "New",
+                "changed": bool(entry.get("changed")),
+                "parking": bool(entry.get("parking")),
                 "sessions": (
                     actions[str(entry["submission_id"])].session_count
                     if str(entry["submission_id"]) in actions

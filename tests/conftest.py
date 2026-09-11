@@ -685,6 +685,18 @@ OSEC_BODY = RENDER_REGRESSION["6736"]["full_body"]
 OSEC_TEXT = RENDER_REGRESSION["6736"]["body_text"]
 COFFEE_HOURS_BODY = RENDER_REGRESSION["6702"]["full_body"]
 COFFEE_HOURS_TEXT = RENDER_REGRESSION["6702"]["body_text"]
+# The 9 September alignment pair: 6846 justifies every paragraph of its body,
+# 6926 carries no style attribute at all and always read correctly.
+JUSTIFIED_BODY = RENDER_REGRESSION["6846"]["full_body"]
+JUSTIFIED_TEXT = RENDER_REGRESSION["6846"]["body_text"]
+MEMORIAL_BODY = RENDER_REGRESSION["6926"]["full_body"]
+MEMORIAL_TEXT = RENDER_REGRESSION["6926"]["body_text"]
+# The 9 September calendar pair: a broad service withheld for the words "free
+# food", and a building tour offered for the word "president".
+WELLNESS_BODY = RENDER_REGRESSION["6783"]["full_body"]
+WELLNESS_TEXT = RENDER_REGRESSION["6783"]["body_text"]
+HOLLYBUSH_BODY = RENDER_REGRESSION["6815"]["full_body"]
+HOLLYBUSH_TEXT = RENDER_REGRESSION["6815"]["body_text"]
 
 
 def regression_record(submission_id: str, **overrides) -> dict:
@@ -699,13 +711,14 @@ def regression_record(submission_id: str, **overrides) -> dict:
         "category_id": entry["category_id"],
         "distribution_dates": ["2026-09-01"],
         "first_distribution_date": "2026-09-01",
-        "status": "New",
+        "status": entry.get("status") or "New",
         "is_event": entry.get("is_event") or 0,
         "event_name": entry.get("event_name"),
         "event_date": entry.get("event_date"),
         "event_start_time": entry.get("event_start_time"),
         "event_end_time": entry.get("event_end_time"),
         "event_location": entry.get("event_location"),
+        "extra_edition": entry.get("extra_edition") or 0,
     }
     record.update(overrides)
     return record

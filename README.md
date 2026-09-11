@@ -24,7 +24,7 @@ approver metadata, and a direct link to the official Rowan page for verification
 
 ```sh
 uv sync
-uv run pytest                      # 991 tests, no network required
+uv run pytest                      # 1,092 tests, no network required
 
 uv run dailymail run-daily         # the full pipeline for today
 uv run dailymail status            # runs, deliveries, timer state
@@ -61,7 +61,7 @@ uv run dailymail run-daily --dry-run
 uv run dailymail render --date 2026-08-21 --inline-images --out /tmp/preview
 ```
 
-Fourteen further tests are opt-in, because they leave the machine or launch a
+Sixteen further tests are opt-in, because they leave the machine or launch a
 browser:
 
 ```sh
@@ -82,7 +82,10 @@ Operational reference — commands, exit codes, failure behaviour, troubleshooti
 **`docs/parking-enrichment.md`**. Calendar actions, travel reservation and
 logical-repeat detection: **`docs/calendar-and-repeats.md`**. Durable repeat
 families, multi-session calendars, the render colour boundary and browser QA:
-**`docs/logical-families-and-sessions.md`**.
+**`docs/logical-families-and-sessions.md`**. Mobile prose alignment, the
+NEW→STANDING transition and calendar relevance:
+**`docs/mobile-rendering-and-relevance.md`**. Why Rowan's Extra Editions are a
+confirmed coverage gap: **`docs/extra-editions.md`**.
 
 ## How it works
 
@@ -102,7 +105,7 @@ families, multi-session calendars, the render colour boundary and browser QA:
           -> send         Gmail STARTTLS, idempotent per date
 ```
 
-Nine things are worth knowing:
+Twelve things are worth knowing:
 
 * **The collector is deterministic and Claude is not in it.** Announcement data
   comes from the app's own JSON endpoint, not from browser scraping — Rowan's UI
@@ -150,6 +153,28 @@ Nine things are worth knowing:
   10-12 people` never becomes a third one. Relevance is still judged once for
   the series, so this costs no extra model call.
   `docs/logical-families-and-sessions.md`.
+* **The digest owns its own alignment, as well as its own colours.** An
+  announcement that justified every paragraph of its body rendered with rivers of
+  whitespace down a 390px Outlook mobile pane, while the announcement above it —
+  which carried no style at all — read normally. Normal prose is now pinned left
+  in the render derivative, and `justify`, arbitrary `right`, `word-spacing` and
+  `text-align-last` are dropped; a table cell's alignment, a figure's layout and
+  compact centred content are deliberately kept. The stored source keeps every
+  byte. `docs/mobile-rendering-and-relevance.md`.
+* **You can see where today's news ends.** Every card was already labelled, but
+  three screens into a forty-announcement scroll that was not enough. The
+  crossing from New to Standing now carries a full-width barrier — gold rule,
+  heavier label, a caption naming what follows — and every Standing card sits on
+  a slightly warmer surface than a New one. Only the surface moves: same ink,
+  same badges, same contrast, so continuing never reads as disabled.
+* **A calendar button is decided by what an event *is*.** `Hollybush Tour` was
+  offered because prose about Lyndon Johnson in 1967 contains the word
+  *president*; the Wellness Center Open House was withheld because *free food*
+  appears in its list of refreshments. Relevance now reads the title, the
+  category, the audience and the announcement's own opening at full weight, the
+  rest of the body at a quarter weight with a hard clamp, and the words that name
+  *who* an event belongs to only from the title. Replayed over every
+  deterministic decision ever recorded, two change and none regresses.
 * **The digest owns its own colours.** An announcement that painted its body in
   a shade three points from the design's own accent rendered as one long
   headline in Outlook mobile's dark mode, because both inverted to the same
@@ -189,12 +214,16 @@ docs/
   logical-families-and-sessions.md
                             Phase 5: durable repeat families, multi-session
                             calendars, render colour policy, browser QA
+  mobile-rendering-and-relevance.md
+                            Phase 6: prose alignment, the NEW->STANDING
+                            transition, calendar relevance, curation timeout
+  extra-editions.md         Phase 6: the confirmed Extra Edition coverage gap
 artifacts/reconnaissance/   sanitized fixtures the test suite runs against
 artifacts/parking/          snapshots of Rowan's authoritative parking sources
-artifacts/qa/fixtures/      the 1 September rendering regression cases
+artifacts/qa/fixtures/      the 1 and 9 September rendering regression cases
 tools/recon/                Phase 0 probes, manual diagnostics only
 tools/qa/                   browser rendering QA, diagnostics only
-tests/                      972 tests, fixture- and mock-driven
+tests/                      1,092 tests, fixture- and mock-driven
 ```
 
 ## Configuration

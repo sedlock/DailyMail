@@ -96,6 +96,30 @@ function hexToRgb(hex) {
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
 }
 
+function relativeLuminance(rgb) {
+  const match = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb || '');
+  if (!match) return null;
+  const channel = (value) => {
+    const c = Number(value) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return (
+    0.2126 * channel(match[1]) +
+    0.7152 * channel(match[2]) +
+    0.0722 * channel(match[3])
+  );
+}
+
+// WCAG contrast, used to say "Standing is a different surface, not a dimmer
+// one" as a number rather than as an opinion.
+function contrastRatio(a, b) {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  if (la === null || lb === null) return 0;
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 // --- main --------------------------------------------------------------------
 
 const { playwright, version, source } = loadPlaywright();
@@ -247,6 +271,304 @@ for (const viewport of VIEWPORTS) {
       );
     }
   }
+
+  // --- alignment: the 9 September justification regression -----------------
+  //
+  // 6846 sets `text-align:justify` on every paragraph of its body. On a 390px
+  // pane with no hyphenation that opens rivers of whitespace between words;
+  // 6926, which carries no style attribute at all, always read correctly. The
+  // render-time policy makes both compute the same way, so this asserts what
+  // the paragraphs actually resolve to rather than what the markup says.
+  const alignment = await page.evaluate(() => {
+    const out = {};
+    for (const card of document.querySelectorAll('.body-copy')) {
+      const cell = card.closest('td');
+      const link = cell.querySelector('a[href*="SubmissionId="]');
+      const id = link ? new URL(link.href).searchParams.get('SubmissionId') : null;
+      if (!id) continue;
+      const blocks = [...card.querySelectorAll('p,div,li,blockquote,h1,h2,h3,h4,h5,h6')];
+      out[id] = {
+        wrapper: getComputedStyle(card).textAlign,
+        blocks: blocks.map((node) => ({
+          tag: node.tagName.toLowerCase(),
+          align: getComputedStyle(node).textAlign,
+          spacing: getComputedStyle(node).wordSpacing,
+          inCell: Boolean(node.closest('td,th')),
+        })),
+        cells: [...card.querySelectorAll('td,th')].map(
+          (node) => getComputedStyle(node).textAlign,
+        ),
+        meta: [...cell.querySelectorAll('.card-meta, .card-meta div')].map(
+          (node) => getComputedStyle(node).textAlign,
+        ),
+      };
+    }
+    return out;
+  });
+
+  for (const card of manifest.cards) {
+    const measured = alignment[card.submission_id];
+    check(`${scope} ${card.submission_id} has measurable alignment`, Boolean(measured));
+    if (!measured) continue;
+    check(
+      `${scope} ${card.submission_id} body wrapper is left-aligned`,
+      measured.wrapper === 'left' || measured.wrapper === 'start',
+      measured.wrapper,
+    );
+    // Justify never survives anywhere, in any card, at any viewport.
+    const justified = measured.blocks.filter((b) => b.align === 'justify');
+    check(
+      `${scope} ${card.submission_id} no source justification survives`,
+      justified.length === 0,
+      justified.map((b) => b.tag).join(', '),
+    );
+    // Ordinary prose is left. A block inside a table cell is excluded: that is
+    // the one place alignment is the author saying something about the data.
+    const stray = measured.blocks.filter(
+      (b) => !b.inCell && b.align !== 'left' && b.align !== 'start' && b.align !== 'center',
+    );
+    check(
+      `${scope} ${card.submission_id} ordinary prose is left-aligned`,
+      stray.length === 0,
+      stray.map((b) => `${b.tag}=${b.align}`).join(', '),
+    );
+    // Word spacing exists only to support justification; none should be set.
+    const spaced = measured.blocks.filter(
+      (b) => b.spacing && b.spacing !== 'normal' && b.spacing !== '0px',
+    );
+    check(
+      `${scope} ${card.submission_id} no justification word-spacing survives`,
+      spaced.length === 0,
+      spaced.map((b) => `${b.tag}=${b.spacing}`).join(', '),
+    );
+    const strayMeta = measured.meta.filter((a) => a !== 'left' && a !== 'start');
+    check(
+      `${scope} ${card.submission_id} source metadata prose is left-aligned`,
+      strayMeta.length === 0,
+      strayMeta.join(', '),
+    );
+  }
+
+  const justifyCard = manifest.cards.find((c) => c.kind === 'justify-leak');
+  const controlCard = manifest.cards.find((c) => c.kind === 'justify-control');
+  check(
+    `${scope} the justified regression case is on the page`,
+    Boolean(justifyCard) && Boolean(alignment[justifyCard?.submission_id]),
+  );
+  if (justifyCard && controlCard) {
+    const bad = alignment[justifyCard.submission_id];
+    const good = alignment[controlCard.submission_id];
+    check(
+      `${scope} the regression case now matches its own control`,
+      bad.blocks.length > 0 &&
+        bad.blocks.every((b) => b.inCell || b.align === 'left' || b.align === 'start') &&
+        good.blocks.every((b) => b.inCell || b.align === 'left' || b.align === 'start'),
+      `bad=${[...new Set(bad.blocks.map((b) => b.align))].join('/')} ` +
+        `control=${[...new Set(good.blocks.map((b) => b.align))].join('/')}`,
+    );
+  }
+
+  // --- NEW -> STANDING: one barrier, and a persistent surface -------------
+  const sections = await page.evaluate(() => {
+    const transitions = [...document.querySelectorAll('.standing-transition')];
+    const cardSurface = (selector) =>
+      [...document.querySelectorAll(selector)].map((cell) => {
+        const link = cell.querySelector('a[href*="SubmissionId="]');
+        const badge = [...cell.querySelectorAll('td')].find((node) =>
+          ['NEW', 'STANDING'].includes(node.textContent.trim()),
+        );
+        const body = cell.querySelector('.body-copy p, .body-copy');
+        return {
+          id: link ? new URL(link.href).searchParams.get('SubmissionId') : null,
+          background: getComputedStyle(cell).backgroundColor,
+          badge: badge ? badge.textContent.trim() : null,
+          bodyColor: body ? getComputedStyle(body).color : null,
+          right: Math.round(cell.getBoundingClientRect().right),
+        };
+      });
+    return {
+      transitionCount: transitions.length,
+      transitionText: transitions.map((node) =>
+        node.textContent.replace(/\s+/g, ' ').trim(),
+      ),
+      // Measured against the digest's own reading column, not the viewport: the
+      // shell is a fixed 680px on desktop, so "full width" means the column.
+      shellWidth: Math.round(
+        (document.querySelector('table.shell') || document.body).getBoundingClientRect()
+          .width,
+      ),
+      transitionBox: transitions.map((node) => {
+        const box = node.getBoundingClientRect();
+        return { width: Math.round(box.width), height: Math.round(box.height) };
+      }),
+      transitionBands: transitions.map((node) =>
+        [...node.querySelectorAll('td')].map((cell) => ({
+          background: getComputedStyle(cell).backgroundColor,
+          height: Math.round(cell.getBoundingClientRect().height),
+        })),
+      ),
+      newCards: cardSurface('td.card-new'),
+      standingCards: cardSurface('td.card-standing'),
+    };
+  });
+
+  check(
+    `${scope} exactly one NEW -> STANDING barrier`,
+    sections.transitionCount === 1,
+    String(sections.transitionCount),
+  );
+  check(
+    `${scope} the barrier keeps its section text`,
+    sections.transitionText.some(
+      (text) =>
+        /STANDING/.test(text) &&
+        new RegExp(`${manifest.counts.standing} continuing announcement`).test(text),
+    ),
+    sections.transitionText.join(' | '),
+  );
+  check(
+    `${scope} the barrier spans the full reading column`,
+    sections.transitionBox.every((box) => box.width >= sections.shellWidth - 1),
+    sections.transitionBox.map((b) => `${b.width}x${b.height}`).join(', ') +
+      ` in a ${sections.shellWidth}px column`,
+  );
+  // Breathing room is part of the design: the barrier is materially taller than
+  // the 7px strip it replaced, so it cannot be scrolled past without noticing.
+  check(
+    `${scope} the barrier has real vertical presence`,
+    sections.transitionBox.every((box) => box.height >= 40),
+    sections.transitionBox.map((b) => `${b.height}px`).join(', '),
+  );
+  // A rule, a label and a caption: three distinct backgrounds, so the barrier
+  // reads as a barrier rather than as one more grey strip.
+  const bands = sections.transitionBands[0] || [];
+  check(
+    `${scope} the barrier is built from visually distinct bands`,
+    new Set(bands.map((band) => normalizeColor(band.background))).size >= 3,
+    bands.map((b) => `${normalizeColor(b.background)}@${b.height}px`).join(', '),
+  );
+  check(
+    `${scope} the barrier carries the gold accent`,
+    bands.some((band) => normalizeColor(band.background) === 'rgb(255, 204, 0)'),
+    bands.map((b) => normalizeColor(b.background)).join(', '),
+  );
+
+  check(`${scope} the page has both New and Standing cards`,
+    sections.newCards.length > 0 && sections.standingCards.length > 0,
+    `${sections.newCards.length} new / ${sections.standingCards.length} standing`);
+
+  const newSurfaces = new Set(sections.newCards.map((c) => normalizeColor(c.background)));
+  const standingSurfaces = new Set(
+    sections.standingCards.map((c) => normalizeColor(c.background)),
+  );
+  check(
+    `${scope} New and Standing cards each have one consistent surface`,
+    newSurfaces.size === 1 && standingSurfaces.size === 1,
+    `${[...newSurfaces].join('/')} vs ${[...standingSurfaces].join('/')}`,
+  );
+  check(
+    `${scope} the Standing surface measurably differs from the New surface`,
+    [...standingSurfaces][0] !== [...newSurfaces][0],
+    `${[...newSurfaces][0]} vs ${[...standingSurfaces][0]}`,
+  );
+  // Different, but not so different that Standing reads as disabled: the body
+  // ink is identical on both and stays well clear of its own background.
+  const proseColors = new Set(
+    [...sections.newCards, ...sections.standingCards]
+      .map((c) => normalizeColor(c.bodyColor))
+      .filter(Boolean),
+  );
+  check(
+    `${scope} Standing body copy keeps the same ink as New`,
+    proseColors.size === 1 && [...proseColors][0] === expectedBody,
+    [...proseColors].join(', '),
+  );
+  const standingContrast = contrastRatio(
+    [...standingSurfaces][0],
+    expectedBody,
+  );
+  check(
+    `${scope} Standing body copy stays highly legible on its surface`,
+    standingContrast >= 7,
+    `contrast ${standingContrast.toFixed(1)}:1`,
+  );
+  check(
+    `${scope} the badge on a Standing card still says STANDING`,
+    sections.standingCards.every((card) => card.badge === 'STANDING'),
+    sections.standingCards.map((c) => `${c.id}=${c.badge}`).join(', '),
+  );
+  check(
+    `${scope} the badge on a New card still says NEW`,
+    sections.newCards.every((card) => card.badge === 'NEW'),
+    sections.newCards.map((c) => `${c.id}=${c.badge}`).join(', '),
+  );
+  const updatedCard = manifest.cards.find((c) => c.changed);
+  if (updatedCard) {
+    const updatedBadge = await page.evaluate((id) => {
+      const link = [...document.querySelectorAll('a[href*="SubmissionId="]')].find(
+        (node) => new URL(node.href).searchParams.get('SubmissionId') === id,
+      );
+      const cell = link ? link.closest('td.card') : null;
+      if (!cell) return null;
+      const badge = [...cell.querySelectorAll('td')].find(
+        (node) => node.textContent.trim() === 'UPDATED',
+      );
+      if (!badge) return null;
+      const style = getComputedStyle(badge);
+      return { color: style.color, background: style.backgroundColor };
+    }, updatedCard.submission_id);
+    check(
+      `${scope} an UPDATED Standing card still shows its UPDATED badge`,
+      Boolean(updatedBadge),
+      updatedCard.submission_id,
+    );
+    if (updatedBadge) {
+      check(
+        `${scope} the UPDATED badge keeps its gold treatment`,
+        normalizeColor(updatedBadge.background) === 'rgb(255, 204, 0)',
+        normalizeColor(updatedBadge.background),
+      );
+    }
+  }
+  const overflowingCards = [...sections.newCards, ...sections.standingCards].filter(
+    (card) => card.right > viewport.width + 1,
+  );
+  check(
+    `${scope} no card overflows the viewport`,
+    overflowingCards.length === 0,
+    overflowingCards.map((c) => `${c.id}@${c.right}`).join(', '),
+  );
+
+  // --- parking callout, unaffected by any of the above ---------------------
+  const parkingBlocks = await page.evaluate(() =>
+    [...document.querySelectorAll('td')]
+      .filter((cell) => /^PARKING LOCATIONS?$/.test(
+        (cell.querySelector('div')?.textContent || '').trim(),
+      ))
+      .map((cell) => ({
+        background: getComputedStyle(cell).backgroundColor,
+        align: getComputedStyle(cell).textAlign,
+        right: Math.round(cell.getBoundingClientRect().right),
+        link: cell.querySelector('a') ? getComputedStyle(cell.querySelector('a')).color : null,
+      })),
+  );
+  check(
+    `${scope} the parking callout is present and intact`,
+    parkingBlocks.length === manifest.parking_callouts,
+    `${parkingBlocks.length} of ${manifest.parking_callouts}`,
+  );
+  check(
+    `${scope} the parking callout keeps its own surface and fits`,
+    parkingBlocks.every(
+      (block) =>
+        normalizeColor(block.background) === 'rgb(250, 247, 242)' &&
+        block.right <= viewport.width + 1 &&
+        normalizeColor(block.link) === expectedAccent,
+    ),
+    parkingBlocks
+      .map((b) => `${normalizeColor(b.background)}@${b.right} link=${normalizeColor(b.link)}`)
+      .join(', '),
+  );
 
   // --- multi-session calendar controls ------------------------------------
   const calendar = await page.evaluate(() => {
@@ -411,15 +733,71 @@ for (const viewport of VIEWPORTS) {
   const inverted = await page.evaluate(() => {
     const card = document.querySelector('.body-copy');
     const headline = document.querySelector('a.subject-link');
+    const surface = (selector) => {
+      const cell = document.querySelector(selector);
+      return cell ? getComputedStyle(cell).backgroundColor : null;
+    };
+    const prose = [...document.querySelectorAll('.body-copy p')].map((node) =>
+      getComputedStyle(node).textAlign,
+    );
+    const bands = [...document.querySelectorAll('.standing-transition td')].map(
+      (cell) => getComputedStyle(cell).backgroundColor,
+    );
     return {
       body: getComputedStyle(card.querySelector('p') || card).color,
       headline: getComputedStyle(headline).color,
+      newSurface: surface('td.card-new'),
+      standingSurface: surface('td.card-standing'),
+      standingInk: (() => {
+        const node = document.querySelector('td.card-standing .body-copy p');
+        return node ? getComputedStyle(node).color : null;
+      })(),
+      newInk: (() => {
+        const node = document.querySelector('td.card-new .body-copy p');
+        return node ? getComputedStyle(node).color : null;
+      })(),
+      prose,
+      bands,
     };
   });
   check(
     `${scope} dark-mode approximation keeps prose and headline distinct`,
     normalizeColor(inverted.body) !== normalizeColor(inverted.headline),
     `${inverted.body} vs ${inverted.headline}`,
+  );
+  // The reader's primary context is Outlook mobile's dark reader mode. No
+  // browser reproduces its exact transform -- this is regression QA, not proof
+  // of identical rendering -- but the properties that must survive a uniform
+  // inversion are all checkable: the section surfaces stay different, the two
+  // sections keep the same ink, that ink stays legible, and the barrier keeps
+  // its bands.
+  check(
+    `${scope} dark-mode approximation keeps New and Standing surfaces apart`,
+    Boolean(inverted.newSurface) &&
+      normalizeColor(inverted.newSurface) !== normalizeColor(inverted.standingSurface),
+    `${normalizeColor(inverted.newSurface)} vs ${normalizeColor(inverted.standingSurface)}`,
+  );
+  check(
+    `${scope} dark-mode approximation keeps Standing body ink equal to New`,
+    normalizeColor(inverted.standingInk) === normalizeColor(inverted.newInk),
+    `${normalizeColor(inverted.standingInk)} vs ${normalizeColor(inverted.newInk)}`,
+  );
+  const invertedContrast = contrastRatio(inverted.standingSurface, inverted.standingInk);
+  check(
+    `${scope} dark-mode approximation keeps Standing prose legible`,
+    invertedContrast >= 7,
+    `contrast ${invertedContrast.toFixed(1)}:1`,
+  );
+  check(
+    `${scope} dark-mode approximation keeps the barrier's bands distinct`,
+    new Set(inverted.bands.map(normalizeColor)).size >= 3,
+    inverted.bands.map(normalizeColor).join(', '),
+  );
+  check(
+    `${scope} dark-mode approximation keeps prose left-aligned`,
+    inverted.prose.length > 0 &&
+      inverted.prose.every((value) => value === 'left' || value === 'start'),
+    [...new Set(inverted.prose)].join(', '),
   );
 
   // Viewport-only by default: a full-page shot of a real digest runs to tens of
