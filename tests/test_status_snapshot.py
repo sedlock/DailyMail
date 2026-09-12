@@ -1057,3 +1057,84 @@ class TestAHostileSnapshotCannotCrashOrLie:
             assert name in document["recent_runs"][0]
         for name in status_snapshot.DELIVERY_COLUMNS:
             assert name in document["latest_delivery"]
+
+
+class TestStatsColumnsAreCompactedNotTruncated:
+    """`runs.parking_stats` is a JSON document in a text column, not prose.
+
+    Clipping it as free text truncated it mid-object, so the snapshot-backed
+    document silently lost every parking metric while the database-backed one
+    kept them. Caught by requiring the two documents to be identical after a
+    real pipeline run; the fix drops what the status document does not read
+    rather than cutting the string.
+    """
+
+    def test_a_long_stats_document_survives_as_valid_json(self, live_db):
+        stats = json.dumps(
+            {
+                "mentions_detected": 1,
+                "cache_hits": 0,
+                "cache_misses": 1,
+                "source_refreshes": 9,
+                "resolver_calls": 1,
+                "new_resolutions": 0,
+                "unresolved": 1,
+                "errors": ["a very long parking source failure " * 20] * 5,
+            }
+        )
+        assert len(stats) > status_snapshot.MAX_TEXT
+        run_id = db.start_run(live_db, TARGET, "timer")
+        db.finish_run(
+            live_db, run_id, status="success", email_status="sent",
+            parking_stats=stats,
+        )
+        stored = status_snapshot.read()["recent_runs"][0]["parking_stats"]
+        # Still parseable, which truncation would have destroyed.
+        parsed = json.loads(stored)
+        assert parsed["mentions_detected"] == 1
+        assert parsed["source_refreshes"] == 9
+        # ...and the unbounded part is gone rather than cut in half.
+        assert "errors" not in parsed
+        assert len(stored) < status_snapshot.MAX_TEXT
+
+    def test_the_parking_metrics_survive_into_the_published_document(
+        self, live_db, monkeypatch
+    ):
+        stats = json.dumps(
+            {
+                "mentions_detected": 3,
+                "cache_hits": 2,
+                "cache_misses": 1,
+                "source_refreshes": 0,
+                "resolver_calls": 0,
+                "new_resolutions": 0,
+                "unresolved": 0,
+                "errors": ["x" * 400],
+            }
+        )
+        run_id = db.start_run(live_db, TARGET, "timer")
+        db.finish_run(
+            live_db, run_id, status="success", email_status="sent",
+            parking_stats=stats,
+        )
+        from_db = health.build_status("database")
+
+        def cantopen(*args, **kwargs):
+            raise sqlite3.OperationalError("unable to open database file")
+
+        monkeypatch.setattr(db, "connect_readonly", cantopen)
+        from_snapshot = health.build_status("auto")
+
+        assert from_db["metrics"]["latest_run_parking_mentions_detected"] == 3
+        assert (
+            from_snapshot["metrics"]["latest_run_parking_mentions_detected"] == 3
+        )
+        assert from_db["recent_runs"] == from_snapshot["recent_runs"]
+
+    def test_a_malformed_stats_column_is_still_bounded(self, live_db):
+        run_id = db.start_run(live_db, TARGET, "timer")
+        db.finish_run(
+            live_db, run_id, status="success", parking_stats="not json " * 200
+        )
+        stored = status_snapshot.read()["recent_runs"][0]["parking_stats"]
+        assert len(stored) <= status_snapshot.MAX_TEXT

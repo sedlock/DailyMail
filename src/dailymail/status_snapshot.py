@@ -123,10 +123,50 @@ def _clip(value: Any) -> Any:
     return value
 
 
+def _compact_stats(value: Any) -> Any:
+    """Re-serialize a stats column keeping only its counters.
+
+    `runs.parking_stats` is a JSON *document* in a text column, not prose, and
+    `health._parse_parking_stats` reads numbers out of it. Clipping it as free
+    text truncated it mid-object, so the snapshot-backed document silently lost
+    every parking metric while the database-backed one kept them -- caught by the
+    test that requires the two to be identical after a real pipeline run.
+
+    So it is bounded by *dropping what the status document does not read* --
+    notably the unbounded `errors` list -- rather than by cutting the string.
+    The result is still valid JSON, still the same type, and strictly smaller.
+    """
+    if not value:
+        return value
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return _clip(value)
+    if not isinstance(parsed, dict):
+        return _clip(value)
+    counters = {
+        name: entry
+        for name, entry in parsed.items()
+        if isinstance(entry, (int, float)) and not isinstance(entry, bool)
+    }
+    return json.dumps(counters, sort_keys=True, separators=(",", ":"))
+
+
+# Columns holding a JSON document rather than prose.
+_STATS_COLUMNS = frozenset({"parking_stats", "calendar_stats"})
+
+
 def _row(row: sqlite3.Row | None, columns) -> dict | None:
     if row is None:
         return None
-    return {name: _clip(row[name]) for name in columns}
+    return {
+        name: (
+            _compact_stats(row[name])
+            if name in _STATS_COLUMNS
+            else _clip(row[name])
+        )
+        for name in columns
+    }
 
 
 # --- building ----------------------------------------------------------------
