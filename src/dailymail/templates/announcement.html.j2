@@ -1,5 +1,12 @@
 {#- One announcement card. Included from email.html.j2 with `item` in scope. -#}
-  <tr><td style="padding:12px 20px 14px 20px;border-bottom:1px solid #e6e6e6;" class="pad">
+{#- A Standing card carries a slightly warmer surface than a New one, so that
+    orientation survives several screens into the Standing section rather than
+    depending on the reader remembering a divider they scrolled past. Only the
+    surface moves: body ink, headline accent and every badge are unchanged, so a
+    continuing announcement reads as continuing, never as disabled. -#}
+{%- set CARD_SURFACE = '#f4f2f1' if item.status != 'New' else '#ffffff' -%}
+{%- set CARD_RULE = '#e0dcd9' if item.status != 'New' else '#e6e6e6' -%}
+  <tr><td class="pad card card-{{ 'standing' if item.status != 'New' else 'new' }}" style="padding:12px 20px 14px 20px;background:{{ CARD_SURFACE }};border-bottom:1px solid {{ CARD_RULE }};">
 
     {#- badge + category row -#}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -16,6 +23,14 @@
           {%- if item.changed %}
           <td style="width:6px;font-size:10px;line-height:12px;">&nbsp;</td>
           <td style="background:#FFCC00;padding:3px 8px 4px 8px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:10px;line-height:12px;font-weight:bold;color:#3d2600;letter-spacing:1px;white-space:nowrap;">UPDATED</td>
+          {%- endif %}
+          {#- Driven only by Rowan's own ExtraEdition flag; never inferred from
+              wording. An Extra Edition still belongs to its New/Standing
+              section and its logical family -- this marks it, it does not move
+              it. -#}
+          {%- if item.extra_edition %}
+          <td style="width:6px;font-size:10px;line-height:12px;">&nbsp;</td>
+          <td class="badge-extra" style="background:#57150B;border:1px solid #FFCC00;padding:2px 7px 3px 7px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:10px;line-height:12px;font-weight:bold;color:#FFCC00;letter-spacing:1px;white-space:nowrap;">EXTRA EDITION</td>
           {%- endif %}
           <td style="width:6px;font-size:10px;line-height:12px;">&nbsp;</td>
           <td style="background:#ffffff;border:1px solid #b9b9b9;padding:2px 7px 3px 7px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:10px;line-height:12px;font-weight:bold;color:#444444;letter-spacing:1px;white-space:nowrap;">{{ item.audience_label }}</td>
@@ -53,14 +68,14 @@
 {% include 'calendar.html.j2' %}
 
     {#- complete announcement body, sanitized -#}
-    <div class="body-copy" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:15px;line-height:1.52;color:#1a1a1a;padding:6px 0 2px 0;">
+    <div class="body-copy" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:15px;line-height:1.52;color:#1a1a1a;text-align:left;padding:6px 0 2px 0;">
       {{ item.body_html }}
     </div>
 
     {#- source metadata -#}
     {%- if item.meta_lines %}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0 0;">
-      <tr><td style="border-top:1px solid #ededed;padding:7px 0 0 0;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:12px;color:#5c5c5c;line-height:1.55;word-break:break-word;">
+      <tr><td class="card-meta" style="border-top:1px solid #ededed;padding:7px 0 0 0;font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:12px;color:#5c5c5c;line-height:1.55;word-break:break-word;text-align:left;">
         {%- for line in item.meta_lines %}
         <div><span style="color:#8a8a8a;">{{ line.label }}</span>&nbsp; {{ line.value }}</div>
         {%- endfor %}

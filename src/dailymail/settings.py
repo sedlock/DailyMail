@@ -101,7 +101,13 @@ daily_send_time = "06:30"
 claude_executable = "{claude_executable}"
 # A capable production model rather than the most expensive option.
 model = "sonnet"
-timeout_seconds = 240
+# Headroom, not an estimate. Ranking a full day has taken up to 237s in
+# production and on 9 September 2026 it reached the old 240s wall, so the run
+# killed a call that was working and shipped the deterministic ordering instead.
+# The digest was complete and correct -- the fallback did its job -- but the
+# reader lost the curation they were entitled to for the sake of three seconds.
+# The whole run is separately bounded by the unit's TimeoutStartSec=1800.
+timeout_seconds = 420
 enabled = true
 
 [parking]
@@ -350,7 +356,7 @@ def load(path: Path | None = None) -> Settings:
         claude_executable=curation.get("claude_executable")
         or _default_claude_executable(),
         claude_model=curation.get("model", "sonnet"),
-        curation_timeout_seconds=int(curation.get("timeout_seconds", 240)),
+        curation_timeout_seconds=int(curation.get("timeout_seconds", 420)),
         curation_enabled=bool(curation.get("enabled", True)),
         image_max_width_px=int(images.get("max_width_px", 1500)),
         image_max_bytes=int(images.get("max_bytes_per_image", 1572864)),

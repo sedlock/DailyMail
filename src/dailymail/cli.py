@@ -498,6 +498,10 @@ def _cmd_render(args: argparse.Namespace) -> int:
                 curation_entries=stored_judgements,
                 curation_method=method,
                 allow_routing=False,
+                # A preview reads. `calendar_recommendations` records what a
+                # given morning's run decided, so re-rendering a past date under
+                # later code must not rewrite that history.
+                persist=False,
             )
 
         digest = render.render_digest(

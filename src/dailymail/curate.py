@@ -59,6 +59,9 @@ RANK HIGHER
   interruption.
 - Unusual or consequential changes; broad population impact.
 - Items marked updated since a previous appearance.
+- Items with "extra_edition": true. Rowan sent these outside its normal daily
+  mail because it judged they could not wait, so rank them at or near the top of
+  whichever section they are in. This does not move an item between sections.
 
 RANK LOWER
 - Generic promotional material, routine low-impact events, social filler.
@@ -111,10 +114,21 @@ Offer the button for things like:
   commencement, family weekend, major academic dates
 - major research or institutional events a senior administrator might attend
 
+- broad student-service events a parent would want their student to know about:
+  an open house for health, counselling or academic support services counts,
+  even though it is published to students
+
 Do NOT offer it for routine student club meetings, low-impact student socials,
 ordinary athletic fixtures, minor promotional events, or narrowly targeted
 activities -- unless the content makes them plausibly relevant to a CTO or to
 the parent of a Rowan student.
+
+Judge the event from what it IS: its title, its category, the audience it was
+published to, and the announcement's own statement of purpose. Wording buried
+deep in the body is weak evidence about an event's nature and must not decide
+the answer on its own. A historical mention of a president does not make a
+building tour a leadership event, and refreshments listed among the details do
+not make an otherwise broad, useful event trivial.
 
 When relevance is genuinely ambiguous, lean towards NOT offering it. A digest
 where every announcement has a calendar button is worse than one where a few do.
@@ -218,6 +232,15 @@ class CurationOutcome:
 # --- payload construction ----------------------------------------------------
 
 
+def _row_value(row, key, default=None):
+    """Read a column that may not exist on every row shape."""
+    try:
+        value = row[key]
+    except (KeyError, IndexError, TypeError):
+        return default
+    return default if value is None else value
+
+
 def _days_between(earlier: str | None, later: str) -> int | None:
     if not earlier:
         return None
@@ -275,6 +298,11 @@ def build_payload(
             "previous_appearances": row["prior_appearances"] or 0,
             "previous_deliveries": row["previous_deliveries"] or 0,
             "updated": bool(row["changed"]),
+            # Rowan's own ExtraEdition boolean. An Extra Edition is a
+            # communication the university decided could not wait for the next
+            # daily mail, so it is worth ranking accordingly -- and it is the
+            # source that says so, never the announcement's own wording.
+            "extra_edition": bool(_row_value(row, "extra_edition")),
         }
         entry = (event_candidates or {}).get(str(row["submission_id"]))
         sessions = entry if isinstance(entry, list) else ([entry] if entry else [])
@@ -690,6 +718,9 @@ def fallback_rank(rows, target_date: str, settings: Settings) -> list[dict]:
         group = sorted(
             by_category[priority],
             key=lambda r: (
+                # An Extra Edition outranks everything in its group: Rowan sent
+                # it outside the daily mail precisely because it could not wait.
+                0 if _row_value(r, "extra_edition") else 1,
                 0 if r["changed"] else 1,
                 -event_proximity(r),
                 -int(r["submission_id"]),
@@ -704,7 +735,8 @@ def fallback_rank(rows, target_date: str, settings: Settings) -> list[dict]:
                     "relevance_score": None,
                     "urgency_score": None,
                     "rationale": (
-                        f"fallback: category priority {priority}, "
+                        ("fallback: EXTRA EDITION, " if _row_value(row, "extra_edition") else "fallback: ")
+                        + f"category priority {priority}, "
                         f"within-category position {index}"
                     ),
                     "calendar": None,
@@ -723,6 +755,10 @@ def fallback_rank(rows, target_date: str, settings: Settings) -> list[dict]:
         score += event_proximity(row)                  # imminent event/deadline
         score += 6.0 if row["source_audience"] == "Both" else 0.0  # breadth
         score -= 2.0 * (row["prior_appearances"] or 0) # repetition penalty
+        if _row_value(row, "extra_edition"):
+            # Large enough to clear the whole ordinary range, because an Extra
+            # Edition is categorically not an ordinary standing item.
+            score += 200.0
         scored.append((score, row))
 
     scored.sort(key=lambda pair: (-pair[0], -int(pair[1]["submission_id"])))

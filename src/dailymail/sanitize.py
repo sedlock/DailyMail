@@ -498,6 +498,293 @@ def apply_body_color_policy(html: str, policy: BodyColorPolicy) -> str:
     return _OPEN_TAG.sub(replace, html)
 
 
+# --- render-time alignment policy ---------------------------------------------
+#
+# The sibling of the colour policy above, and for the same reason. `text-align`
+# is inert, so the security allowlist keeps it -- but whether an author's
+# alignment is *legible* inside DailyMail's card is not a security question, and
+# on a narrow viewport one answer is clearly wrong.
+#
+# Rowan announcement 6846, the RCHGHR student-led discussion, sets
+#
+#     <p style="margin-left:0in;text-align:justify;">
+#
+# on every paragraph of its body. Full justification on a 390px Outlook mobile
+# pane, with no hyphenation engine, opens rivers of whitespace between words; the
+# control that reads correctly, 6926 (the September 11 memorial service), simply
+# carries no style attribute at all and inherits the digest's own left alignment.
+#
+# So the digest owns normal prose alignment the same way it owns normal prose
+# colour: source justification is dropped, arbitrary right alignment in ordinary
+# prose is dropped, and every prose block is pinned to `left` explicitly -- which
+# also stops an alignment set on a wrapper from leaking into the blocks inside
+# it. The stored `FullBody` is untouched; this operates on the render derivative.
+#
+# Three things are deliberately NOT normalized, because there alignment carries
+# meaning rather than decoration:
+#
+#   * table cells and the table chrome around them -- a right-aligned numeric
+#     column is the author saying something true about the data;
+#   * `figure`/`figcaption` and image layout;
+#   * compact centred content. A centred one-line call to action or a centred
+#     image caption is a deliberate visual choice and forcing it left looks
+#     broken. A centred block holding a whole article is not compact, and is
+#     treated as ordinary prose.
+
+# Properties that exist only to support justification. None of them is in
+# `ALLOWED_STYLE_PROPERTIES`, so `filter_style` already drops them -- this is the
+# belt to that braces, so the policy stays correct if the allowlist ever widens.
+_JUSTIFICATION_SUPPORT = frozenset({"text-align-last", "text-justify", "word-spacing"})
+
+# Blocks that hold ordinary announcement prose. These get an explicit alignment.
+PROSE_ALIGN_TAGS = frozenset(
+    {"p", "div", "li", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6",
+     "dt", "dd", "pre", "small"}
+)
+
+# Structure whose alignment is the author saying something about the layout.
+# Left entirely alone: neither stripped nor pinned.
+STRUCTURAL_ALIGN_TAGS = frozenset(
+    {"table", "thead", "tbody", "tfoot", "tr", "td", "th", "col", "caption",
+     "figure", "figcaption", "img"}
+)
+
+# A centred prose block is kept centred only while it stays compact. Measured on
+# the block's own collapsed text, so a centred banner line survives and a centred
+# article does not. 200 characters is roughly two printed lines at the digest's
+# body size on the narrowest supported viewport.
+COMPACT_CENTRE_CHARS = 200
+
+
+@dataclass(frozen=True)
+class BodyAlignmentPolicy:
+    """The alignment DailyMail imposes on announcement body copy.
+
+    `normalize=False` disables the policy entirely, which is what the pure
+    sanitizer tests use to prove the security allowlist is unchanged -- and what
+    the browser QA suite rebuilds the page with to prove its own assertions can
+    actually fail.
+    """
+
+    prose: str = "left"
+    normalize: bool = True
+    compact_centre_chars: int = COMPACT_CENTRE_CHARS
+
+
+def strip_alignment_declarations(style: str, *, drop_text_align: bool = True) -> str:
+    """Remove alignment and its justification helpers, keep everything else."""
+    kept = []
+    for declaration in (style or "").split(";"):
+        name, separator, value = declaration.partition(":")
+        if not separator:
+            continue
+        name, value = name.strip(), value.strip()
+        if not name or not value:
+            continue
+        lowered = name.lower()
+        if lowered in _JUSTIFICATION_SUPPORT:
+            continue
+        if drop_text_align and lowered == "text-align":
+            continue
+        kept.append(f"{name}:{value}")
+    return ";".join(kept)
+
+
+def _declared_alignment(attrs: dict) -> str | None:
+    """The element's own alignment, from `style` first and then `align=`."""
+    style = attrs.get("style") or ""
+    for declaration in style.split(";"):
+        name, separator, value = declaration.partition(":")
+        if separator and name.strip().lower() == "text-align":
+            value = value.strip().lower()
+            if value:
+                return value
+    align = (attrs.get("align") or "").strip().lower()
+    return align or None
+
+
+class _AlignmentTransformer(HTMLParser):
+    """Rewrites alignment on prose blocks. Structure is never touched.
+
+    Two phases, because a centred block's fate depends on how much text it turns
+    out to hold and that is only known once it closes -- and a block that inherits
+    centring from an ancestor depends on the *ancestor's* fate, which is later
+    still. So parsing records one frame per prose element and emits a placeholder
+    chunk; `result()` then resolves the frames parent-first and patches each
+    placeholder in place.
+    """
+
+    def __init__(self, policy: BodyAlignmentPolicy) -> None:
+        super().__init__(convert_charrefs=False)
+        self._policy = policy
+        self._out: list[str] = []
+        # One entry per prose element, in document order, so a parent is always
+        # resolved before any of its children.
+        self._frames: list[dict] = []
+        self._open_prose: list[int] = []   # indices into _frames
+        self._stack: list[tuple[str, int | None]] = []   # (tag, frame index)
+
+    # -- helpers ---------------------------------------------------------
+
+    @staticmethod
+    def _render(tag: str, attrs: dict) -> str:
+        parts = [tag]
+        for name, value in attrs.items():
+            parts.append(f'{name}="{escape(value or "", quote=True)}"')
+        return f"<{' '.join(parts)}>"
+
+    def _count_text(self, text: str) -> None:
+        length = len(" ".join(text.split()))
+        if not length:
+            return
+        for index in self._open_prose:
+            self._frames[index]["length"] += length
+
+    # -- parser events ---------------------------------------------------
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        tag = tag.lower()
+        mapping = {
+            name.lower(): (value if value is not None else "")
+            for name, value in attrs
+        }
+        void = tag in VOID_TAGS
+
+        if tag in STRUCTURAL_ALIGN_TAGS:
+            # Structure keeps its own alignment: a right-aligned numeric column
+            # is the author saying something true. Only the properties that exist
+            # purely to justify text are removed.
+            self._emit_untouched(tag, mapping, drop_text_align=False)
+            if not void:
+                self._stack.append((tag, None))
+            return
+
+        if tag not in PROSE_ALIGN_TAGS:
+            # Inline elements and list containers. Nothing is pinned -- their
+            # alignment comes from the block they sit in -- but a source
+            # justification is still removed so nothing can inherit one.
+            declared = _declared_alignment(mapping)
+            self._emit_untouched(
+                tag, mapping, drop_text_align=declared in ("justify", "right")
+            )
+            if not void:
+                self._stack.append((tag, None))
+            return
+
+        parent = self._open_prose[-1] if self._open_prose else None
+        index = len(self._frames)
+        self._frames.append(
+            {
+                "tag": tag,
+                "attrs": mapping,
+                "own": _declared_alignment(mapping),
+                "parent": parent,
+                "chunk": len(self._out),
+                "length": 0,
+                "resolved": None,
+            }
+        )
+        self._out.append("")          # placeholder, patched in result()
+        if void:                      # no prose tag is void, but do not assume it
+            return
+        self._open_prose.append(index)
+        self._stack.append((tag, index))
+
+    def _emit_untouched(self, tag: str, mapping: dict, *, drop_text_align: bool) -> None:
+        if mapping.get("style"):
+            cleaned = strip_alignment_declarations(
+                mapping["style"], drop_text_align=drop_text_align
+            )
+            if cleaned:
+                mapping["style"] = cleaned
+            else:
+                mapping.pop("style")
+        if drop_text_align and (mapping.get("align") or "").strip().lower() in (
+            "justify", "right"
+        ):
+            mapping.pop("align")
+        self._out.append(self._render(tag, mapping))
+
+    def handle_startendtag(self, tag: str, attrs: list) -> None:
+        self.handle_starttag(tag, attrs)
+        if tag.lower() not in VOID_TAGS:
+            self.handle_endtag(tag)
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in VOID_TAGS:
+            return
+        for position in range(len(self._stack) - 1, -1, -1):
+            if self._stack[position][0] == tag:
+                for _name, frame_index in self._stack[position:]:
+                    if frame_index is not None and frame_index in self._open_prose:
+                        self._open_prose.remove(frame_index)
+                del self._stack[position:]
+                break
+        self._out.append(f"</{tag}>")
+
+    def handle_data(self, data: str) -> None:
+        self._count_text(data)
+        self._out.append(escape(data, quote=False))
+
+    def handle_entityref(self, name: str) -> None:
+        self._count_text(" ")
+        self._out.append(f"&{name};")
+
+    def handle_charref(self, name: str) -> None:
+        self._count_text(" ")
+        self._out.append(f"&#{name};")
+
+    def handle_comment(self, data: str) -> None:  # comments never survive
+        return
+
+    # -- resolution ------------------------------------------------------
+
+    def result(self) -> str:
+        limit = self._policy.compact_centre_chars
+        for frame in self._frames:
+            own = frame["own"]
+            parent = frame["parent"]
+            if own is None:
+                inherited = (
+                    self._frames[parent]["resolved"] == "center"
+                    if parent is not None
+                    else False
+                )
+                wants_centre = inherited
+            else:
+                # `justify` and any arbitrary `right` in ordinary prose are the
+                # whole point of this policy and are never honoured.
+                wants_centre = own == "center"
+            frame["resolved"] = (
+                "center"
+                if wants_centre and frame["length"] <= limit
+                else self._policy.prose
+            )
+            attrs = dict(frame["attrs"])
+            style = strip_alignment_declarations(attrs.get("style") or "")
+            forced = f"text-align:{frame['resolved']}"
+            attrs["style"] = f"{style};{forced}" if style else forced
+            attrs.pop("align", None)
+            self._out[frame["chunk"]] = self._render(frame["tag"], attrs)
+        return "".join(self._out)
+
+
+def apply_body_alignment_policy(html: str, policy: BodyAlignmentPolicy) -> str:
+    """Pin sanitized body copy to the digest's own alignment. Idempotent.
+
+    Runs after `clean()`, so it only ever sees markup a real HTML sanitizer has
+    already approved: it edits one attribute per element and never invents,
+    reorders or drops a tag.
+    """
+    if not html or not policy.normalize:
+        return html
+    parser = _AlignmentTransformer(policy)
+    parser.feed(html)
+    parser.close()
+    return parser.result()
+
+
 def tighten(html: str) -> str:
     """Cosmetic density pass. Runs after sanitization, so it only ever sees
     already-safe markup and cannot reintroduce anything unsafe."""
@@ -511,20 +798,27 @@ def tighten(html: str) -> str:
 
 
 def sanitize_body(
-    html: str, *, image_resolver=None, color_policy: BodyColorPolicy | None = None
+    html: str,
+    *,
+    image_resolver=None,
+    color_policy: BodyColorPolicy | None = None,
+    alignment_policy: BodyAlignmentPolicy | None = None,
 ) -> tuple[str, LinkStats, int]:
     """Full pipeline. Returns (safe_html, link_stats, images_seen).
 
-    `color_policy` is the render-time presentation pass. It is deliberately
-    optional and off by default: sanitization decides what is *safe*, the policy
-    decides what is *legible inside DailyMail's card*, and keeping them separate
-    means the security allowlist can be tested without a palette in scope.
+    `color_policy` and `alignment_policy` are the render-time presentation
+    passes. Both are deliberately optional and off by default: sanitization
+    decides what is *safe*, the policies decide what is *legible inside
+    DailyMail's card*, and keeping them separate means the security allowlist can
+    be tested without a palette or a viewport in scope.
     """
     prefiltered = prefilter(html)
     rewritten, stats, images = transform(prefiltered, image_resolver=image_resolver)
     safe = tighten(clean(rewritten))
     if color_policy is not None:
         safe = apply_body_color_policy(safe, color_policy)
+    if alignment_policy is not None:
+        safe = apply_body_alignment_policy(safe, alignment_policy)
     return safe, stats, images
 
 
