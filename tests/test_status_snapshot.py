@@ -662,8 +662,11 @@ class TestHealthSources:
         monkeypatch.setattr(db, "connect_readonly", cantopen)
         document = health.build_status("auto")
         assert document["status_data_source"] == "snapshot"
-        # The outage is still reported. Falling back does not mean pretending.
-        assert "unable to open database file" in document["adapter_errors"]
+        # The outage is still reported -- falling back does not mean pretending --
+        # but in the field that means "the live probe failed", not the one that
+        # means "my status is incomplete", because it is not.
+        assert document["status_database_probe_error"] == "unable to open database file"
+        assert document["adapter_errors"] == []
         # ...and the reader still learns what actually happened.
         assert document["metrics"]["latest_success_announcements_unique"] == 27
         assert len(document["recent_runs"]) == 1
@@ -947,8 +950,10 @@ class TestCollectorBoundary:
         assert document["metrics"]["latest_success_announcements_new"] == 8
         assert document["metrics"]["latest_success_announcements_standing"] == 19
         assert document["components"]
-        # The live failure is still on the record.
-        assert document["adapter_errors"]
+        # The live failure is still on the record, named for what it is.
+        assert document["status_database_probe_error"]
+        # ...and this document is complete, so it does not claim otherwise.
+        assert document["adapter_errors"] == []
 
     def test_the_probe_creates_no_sidecar_in_the_data_directory(self, boundary):
         health.build_status("auto")

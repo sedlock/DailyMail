@@ -550,14 +550,29 @@ def build_status(source: str = SOURCE_AUTO) -> dict[str, Any]:
         "metrics": metrics,
         "recent_runs": [_run_summary(row) for row in rows],
         "problems": _problems(components),
-        # Both failures are reported, separately and in full. A snapshot that
-        # rescued the document does not erase the database error that made it
-        # necessary, and a snapshot that failed too does not erase either.
-        "adapter_errors": [
-            message
-            for message in (db_error, snapshot_error, *staleness_notes)
-            if message
-        ],
+        # `adapter_errors` means one specific thing to the consumer: *this
+        # application could not read its own data, so what it published is
+        # incomplete*. ControlPanel turns it into a DEGRADED `status-data`
+        # component saying exactly that.
+        #
+        # So it is reserved for that. When the snapshot answered and is fresh,
+        # the published status is **complete and current** -- the live database
+        # read failed, but nothing is missing -- and reporting incompleteness
+        # would be false, and would pin DailyMail to `degraded` forever on a
+        # condition that is the designed operating mode rather than a fault.
+        #
+        # The database failure is not hidden by that: it is published in
+        # `status_database_probe_error` on every document where it occurred,
+        # `status_data_source` says `snapshot`, and each component's `source`
+        # names the snapshot. What changes is only whether it is *categorised*
+        # as "my status is incomplete", which after a successful fallback it is
+        # not.
+        "adapter_errors": _adapter_errors(
+            db_error, snapshot_error, staleness_notes, data_source
+        ),
+        # Always present when the live read failed, whatever rescued the
+        # document. This is the honest, permanent record of the probe failure.
+        **({"status_database_probe_error": db_error} if db_error else {}),
         # Provenance. Never omitted, so "which of these did I get?" is always
         # answerable without inference.
         "status_data_source": data_source,
@@ -708,6 +723,28 @@ def _load_from_snapshot(observed_at: str, timer: dict[str, Any]):
         meta,
         None,
     )
+
+
+def _adapter_errors(
+    db_error: str | None,
+    snapshot_error: str | None,
+    staleness_notes: list[str],
+    data_source: str,
+) -> list[str]:
+    """What to report as "my own data access failed and my status is incomplete".
+
+    Only genuine incompleteness. A fresh snapshot that answered in full is not
+    incomplete, however the database read went -- see the note at the call site
+    for why that distinction is worth drawing rather than reporting everything.
+    """
+    if data_source == SOURCE_SNAPSHOT and not staleness_notes:
+        # Complete and current. Nothing is missing from this document.
+        return []
+    return [
+        message
+        for message in (db_error, snapshot_error, *staleness_notes)
+        if message
+    ]
 
 
 def unavailable_status(reason: str) -> dict[str, Any]:

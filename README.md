@@ -24,7 +24,7 @@ approver metadata, and a direct link to the official Rowan page for verification
 
 ```sh
 uv sync
-uv run pytest                      # 1,211 tests, no network required
+uv run pytest                      # 1216, no network required
 
 uv run dailymail run-daily         # the full pipeline for today
 uv run dailymail status            # runs, deliveries, timer state
@@ -266,7 +266,7 @@ artifacts/parking/          snapshots of Rowan's authoritative parking sources
 artifacts/qa/fixtures/      the 1 and 9 September rendering regression cases
 tools/recon/                Phase 0 probes, manual diagnostics only
 tools/qa/                   browser rendering QA, diagnostics only
-tests/                      1,211 tests, fixture- and mock-driven
+tests/                      1216, fixture- and mock-driven
 ```
 
 ## Configuration

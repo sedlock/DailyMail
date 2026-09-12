@@ -539,3 +539,63 @@ class TestSnapshotOnlyModeSaysUnreadableNotNeverRan:
         assert result["health"] == "unknown"
         assert "No DailyMail run has been recorded" not in result["summary"]
         assert result["adapter_errors"]
+
+
+class TestAdapterErrorsMeansIncompleteNotFailed:
+    """`adapter_errors` is a specific claim, and it was being overstated.
+
+    ControlPanel turns any non-empty `adapter_errors` into a DEGRADED
+    `status-data` component reading "the application reported that its own data
+    access failed, so its published status is incomplete". Observed in
+    production after the first activation: DailyMail sat at `degraded` on every
+    single collection, because the live database read always fails under the
+    collector boundary -- which is the *designed operating mode* here, not a
+    fault, and the published status was complete and current.
+
+    A permanently red signal is a signal nobody reads. So the probe failure is
+    still published, on every document where it happened, in a field named for
+    what it is; `adapter_errors` is reserved for documents that really are
+    missing something.
+    """
+
+    @pytest.fixture
+    def fallen_back(self, live_db, cantopen):
+        a_run(live_db)
+        return health.build_status("auto")
+
+    def test_a_complete_fallback_does_not_claim_incompleteness(self, fallen_back):
+        assert fallen_back["status_data_source"] == "snapshot"
+        assert fallen_back["adapter_errors"] == []
+        assert fallen_back["health"] == "healthy"
+
+    def test_the_probe_failure_is_still_published(self, fallen_back):
+        assert (
+            fallen_back["status_database_probe_error"]
+            == "unable to open database file"
+        )
+        assert "snapshot" in fallen_back["components"][0]["source"]
+
+    def test_a_successful_database_read_publishes_no_probe_error(self, live_db):
+        a_run(live_db)
+        document = health.build_status("database")
+        assert "status_database_probe_error" not in document
+        assert document["adapter_errors"] == []
+
+    def test_a_stale_fallback_does_claim_incompleteness(self, live_db, cantopen):
+        a_run(live_db)
+        path = config.status_snapshot_path()
+        document = json.loads(path.read_text(encoding="utf-8"))
+        document["generated_at"] = "2024-01-01T00:00:00+00:00"
+        path.write_text(json.dumps(document), encoding="utf-8")
+        result = health.build_status("auto")
+        assert result["adapter_errors"], "a stale document IS incomplete"
+        assert result["status_database_probe_error"]
+        assert result["health"] == "unknown"
+
+    def test_a_failed_fallback_does_claim_incompleteness(self, live_db, cantopen):
+        a_run(live_db)
+        config.status_snapshot_path().unlink()
+        result = health.build_status("auto")
+        assert len(result["adapter_errors"]) == 2
+        assert result["status_database_probe_error"]
+        assert result["status_data_source"] == "unavailable"

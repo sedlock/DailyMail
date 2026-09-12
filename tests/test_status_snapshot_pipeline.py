@@ -108,5 +108,10 @@ def test_the_snapshot_from_a_real_run_reproduces_the_database_document(
         from_db["metrics"]["latest_success_target_date"]
         == from_snapshot["metrics"]["latest_success_target_date"]
     )
-    # The live failure is still reported even though the document is complete.
-    assert "unable to open database file" in from_snapshot["adapter_errors"]
+    # The live failure is still reported even though the document is complete --
+    # and because the document *is* complete, it is reported as a probe failure
+    # rather than as incompleteness.
+    assert (
+        from_snapshot["status_database_probe_error"] == "unable to open database file"
+    )
+    assert from_snapshot["adapter_errors"] == []
