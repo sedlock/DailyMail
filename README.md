@@ -24,11 +24,12 @@ approver metadata, and a direct link to the official Rowan page for verification
 
 ```sh
 uv sync
-uv run pytest                      # 1,092 tests, no network required
+uv run pytest                      # 1,158 tests, no network required
 
 uv run dailymail run-daily         # the full pipeline for today
 uv run dailymail status            # runs, deliveries, timer state
 uv run dailymail health --json     # read-only controlpanel.status.v1 document
+uv run dailymail status-snapshot refresh      # republish the status snapshot
 uv run dailymail db-status         # database and category state
 uv run dailymail parking-status    # the parking reference cache
 uv run dailymail families          # logical repeat families
@@ -113,7 +114,9 @@ families, multi-session calendars, the render colour boundary and browser QA:
 **`docs/logical-families-and-sessions.md`**. Mobile prose alignment, the
 NEW→STANDING transition and calendar relevance:
 **`docs/mobile-rendering-and-relevance.md`**. Why Rowan's Extra Editions are a
-confirmed coverage gap: **`docs/extra-editions.md`**.
+confirmed coverage gap: **`docs/extra-editions.md`**. Why `health` publishes a
+snapshot instead of reading a WAL database an observer cannot open:
+**`docs/status-snapshot.md`**.
 
 ## How it works
 
@@ -133,7 +136,7 @@ confirmed coverage gap: **`docs/extra-editions.md`**.
           -> send         Gmail STARTTLS, idempotent per date
 ```
 
-Twelve things are worth knowing:
+Thirteen things are worth knowing:
 
 * **The collector is deterministic and Claude is not in it.** Announcement data
   comes from the app's own JSON endpoint, not from browser scraping — Rowan's UI
@@ -181,6 +184,15 @@ Twelve things are worth knowing:
   10-12 people` never becomes a third one. Relevance is still judged once for
   the series, so this costs no extra model call.
   `docs/logical-families-and-sessions.md`.
+* **A status probe that cannot read the database still tells the truth.**
+  `health` opened the live SQLite read-only — and a WAL database cannot be read
+  at all without a `-shm` sidecar it must *create* in the database's directory,
+  which ControlPanel's read-only collector cannot do. 6,786 of 6,801 collections
+  returned a valid but blank document and every run was seen a day late. So
+  DailyMail now publishes a bounded, redacted snapshot of its own committed
+  state after each run and delivery transition, and `health` reads that when the
+  database is unreadable — labelled as a snapshot, with its timestamp, and with
+  the live database error still attached. `docs/status-snapshot.md`.
 * **The digest owns its own alignment, as well as its own colours.** An
   announcement that justified every paragraph of its body rendered with rivers of
   whitespace down a 390px Outlook mobile pane, while the announcement above it —
@@ -229,6 +241,7 @@ src/dailymail/
   repeats.py                                                          logical repeats + families
   events.py travel.py calendar_action.py calendar_enrich.py           calendar actions + sessions
   curate.py                                                           Claude ranking + fallback
+  atomic.py status_snapshot.py                                        status projection
   sanitize.py images.py render.py templates/                          the email
   mailer.py                                                           MIME + SMTP
   parking*.py                                                         parking enrichment
@@ -246,12 +259,14 @@ docs/
                             Phase 6: prose alignment, the NEW->STANDING
                             transition, calendar relevance, curation timeout
   extra-editions.md         Phase 6: the confirmed Extra Edition coverage gap
+  status-snapshot.md        Phase 7: the WAL status probe, and the bounded
+                            snapshot health reads when the database cannot be
 artifacts/reconnaissance/   sanitized fixtures the test suite runs against
 artifacts/parking/          snapshots of Rowan's authoritative parking sources
 artifacts/qa/fixtures/      the 1 and 9 September rendering regression cases
 tools/recon/                Phase 0 probes, manual diagnostics only
 tools/qa/                   browser rendering QA, diagnostics only
-tests/                      1,092 tests, fixture- and mock-driven
+tests/                      1,158 tests, fixture- and mock-driven
 ```
 
 ## Configuration
