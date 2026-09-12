@@ -152,12 +152,25 @@ never implies it did.
 
 The two are reported separately, because conflating them is how a probe lies:
 
-| situation | `status_data_source` | component health | `adapter_errors` |
-|---|---|---|---|
-| database read worked | `database` | from the data | empty |
-| database failed, snapshot fresh | `snapshot` | **from the data** | the database error |
-| database failed, snapshot stale | `snapshot` | `unknown` | database error **+** staleness |
-| database failed, no/bad snapshot | `unavailable` | `unknown` | database error **+** the snapshot's own reason |
+| situation | `status_data_source` | component health | `status_database_probe_error` | `adapter_errors` |
+|---|---|---|---|---|
+| database read worked | `database` | from the data | absent | empty |
+| database failed, snapshot fresh | `snapshot` | **from the data** | the database error | **empty** |
+| database failed, snapshot stale | `snapshot` | `unknown` | the database error | database error **+** staleness |
+| database failed, no/bad snapshot | `unavailable` | `unknown` | the database error | database error **+** the snapshot's own reason |
+
+`adapter_errors` is a specific claim, not a log. ControlPanel turns any non-empty
+value into a DEGRADED `status-data` component reading *"the application reported
+that its own data access failed, so its published status is incomplete"*. Row two
+is not that: the status is complete and current. Reporting it there pinned
+DailyMail to `degraded` on every collection — observed in production after the
+first activation of this change — on a condition that is the designed operating
+mode rather than a fault, and a permanently red signal is one nobody reads.
+
+So the probe failure is published on every document where it happened, in
+`status_database_probe_error`, named for what it is; `status_data_source` says
+`snapshot`; and each component's `source` names the snapshot. `adapter_errors` is
+reserved for documents that really are missing something.
 
 Reporting `unknown` while holding a fresh snapshot that says this morning's run
 delivered would under-report exactly as badly as reporting `healthy` from a
