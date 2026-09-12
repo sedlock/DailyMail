@@ -185,6 +185,18 @@ dailymail status-snapshot refresh    # rebuild from committed state
 dailymail status-snapshot show       # print it, rewrite nothing
 ```
 
+**This is an activation step, not an optional one.** Because activation is
+release-pinned and the collector cannot read the WAL database at all, a freshly
+activated release reports `status_data_source: unavailable` from the moment of
+activation until the next 06:30 run — or, after a rollback, serves the other
+release's file. So the runbook is:
+
+```sh
+controlpanel release build-activate --target dailymail --commit <SHA> \
+    --source dailymail-development
+/mnt/bench/releases/dailymail/current/.venv/bin/dailymail status-snapshot refresh
+```
+
 `refresh` exists so a freshly activated release publishes a correct status
 immediately instead of waiting for the next morning. It opens the database
 **read-only**, projects committed state and writes one file. It performs no
@@ -199,7 +211,34 @@ Measured against the real 24 MB production database: **0.2 ms** to build,
 **1.2 ms** including the fsynced atomic write, producing a **~9.6 KB** document.
 A full `run-daily` publishes four times — about **5 ms** against a ~95 s run.
 
-## 7. ControlPanel
+## 7. What independent review changed
+
+Three read-only reviews ran against a frozen candidate — SQLite/WAL correctness
+and delivery safety, security and redaction, and test quality and deployment
+safety. Between them they found nine substantiated defects. Every one is fixed
+and has a regression test.
+
+| Finding | What it would have done |
+|---|---|
+| A schema-valid but incomplete snapshot raised `KeyError` out of `health` | A traceback instead of a document — strictly worse than the blank document this replaces, arriving exactly when something else is wrong. The realistic trigger is release skew. |
+| Staleness failed **open** | An unparseable `daily_send_time`, an unknown timezone, a corrupt `config.toml`, or a sandbox hiding `~/.config` made `status_snapshot_stale` `None`, which was treated as "fresh". A three-week-old snapshot reported `healthy` with an empty `adapter_errors`. |
+| `parking_stats` clipped as free text | It is a JSON document; truncating it produced invalid JSON, and 14 parking metrics silently vanished from the snapshot-backed document — exactly when parking was failing. |
+| `error_summary` written to disk unredacted | `mailer.send` raises `recipients refused: [...]` with the address in it. `health` scrubbed on the way out, but the file did not, and `status-snapshot show` prints the file. |
+| The state directory created at the umask default | 0775, group-writable. Directory write permission — not the file's 0600 — governs replacement. |
+| `read()` resolved the path four times | Symlink check, `stat`, size check and open were four separate resolutions; the size bound was enforced on what `stat` reported rather than on bytes read. |
+| A FIFO at the snapshot path blocked `health` forever | `os.open` on a FIFO waits for a writer. A denial of service on the one command that must always answer. |
+| `bool` published as a count; unbounded metric names and field values | `database_runs: true` reaching a field ControlPanel reads as an integer. |
+| `build()` was ~30 statements in autocommit | A concurrent commit could interleave, so the document mixed two instants. |
+
+Two test-quality findings mattered as much. A reviewer replaced the entire
+atomic-write body with a plain in-place `open()` and the whole suite still
+passed — the tests that looked like they covered atomicity wrote *sequentially*.
+Another replaced the schedule-window staleness rule with a naive `age > 1 hour`
+and **nothing failed**, because every existing case used an age both rules flag.
+Both properties now have tests that kill those mutants: a reader thread racing a
+writer, and a snapshot written at 06:32 read at 23:00 the same day.
+
+## 8. ControlPanel
 
 No ControlPanel change is required to consume this, and no new grant to
 ControlPanel is involved. ControlPanel's presentation safeguard — retaining what

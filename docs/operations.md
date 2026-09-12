@@ -70,6 +70,9 @@ uv run dailymail health --json                   # read-only controlpanel.status
 uv run dailymail health --json --source database # database only, never falls back
 uv run dailymail health --json --source snapshot # snapshot only, never opens SQLite
 uv run dailymail status-snapshot refresh         # republish the snapshot now
+# ^ run this from the *immutable release* immediately after every activation:
+#   /mnt/bench/releases/dailymail/current/.venv/bin/dailymail status-snapshot refresh
+#   Otherwise ControlPanel reports `unavailable` until the next 06:30 run.
 uv run dailymail status-snapshot show            # print it without rewriting
 uv run dailymail status --json                   # compatibility alias for the same JSON
 uv run dailymail db-status                       # schema, counts, categories, backups

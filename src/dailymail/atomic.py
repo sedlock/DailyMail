@@ -59,7 +59,12 @@ def atomic_write_json(
     what a large collection artifact does not need to pay for.
     """
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    # 0700 explicitly. Directory write permission -- not the file's 0600 -- is
+    # what governs `unlink` and `rename`, so a directory created at the umask
+    # default (0775 here) would let anyone in the group replace a file this
+    # function just wrote at 0600. `settings.ensure_config` already creates its
+    # directory this way; this was the outlier.
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     _check_destination(path)
 
     handle, temp_name = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")

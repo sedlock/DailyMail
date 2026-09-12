@@ -144,12 +144,26 @@ def make_wal_database(directory: Path, *, checkpointed: bool) -> Path:
         os.kill(os.getpid(), signal.SIGKILL)
         """
     )
-    subprocess.run([sys.executable, "-c", script], check=False)
+    # Bounded and captured. This child is a fresh interpreter, so it runs
+    # *outside* the suite's audit hook -- the one place in the tests where the
+    # hermetic boundary is not watching. It only ever touches `tmp_path`, and it
+    # cannot hang the suite.
+    subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        timeout=60,
+    )
     return path
 
 
 def read_only(path: Path):
-    """Make a directory unwritable, and put it back afterwards."""
+    """Make a directory unwritable and return its previous mode.
+
+    It does **not** put the mode back -- every caller owns that in a `finally`.
+    The docstring used to claim otherwise, which is the kind of thing that
+    eventually leaves a developer with a 0500 directory and no idea why.
+    """
     original = path.stat().st_mode
     path.chmod(original & ~0o222)
     return original
@@ -314,6 +328,8 @@ class TestTransactionOrdering:
         assert document["last_confirmed_delivery"] is None
 
     def test_a_rolled_back_transaction_never_reaches_the_snapshot(self, live_db):
+        """A guard, not a reproduction: no code publishes from a rollback today,
+        and this is what fails if one ever starts."""
         seed(live_db, runs=[{"status": "success", "email_status": "sent"}])
         baseline = status_snapshot.read()
         with pytest.raises(RuntimeError):
@@ -495,13 +511,24 @@ class TestFileMechanics:
             assert loaded["n"] == index
         assert [p.name for p in tmp_path.iterdir()] == ["status.json"]
 
-    def test_the_collector_artifact_still_uses_the_same_writer(self):
-        """One implementation, not two that drift."""
+    def test_the_collector_artifact_still_uses_the_same_writer(self, monkeypatch):
+        """One implementation, not two that drift.
+
+        Asserted by behaviour rather than by grepping the source, which would
+        pass on an unused import.
+        """
         from dailymail import collect
 
-        assert "atomic_write_json" in Path(collect.__file__).read_text(
-            encoding="utf-8"
-        )
+        calls: list = []
+        real = atomic.atomic_write_json
+
+        def watched(path, document, **kwargs):
+            calls.append(Path(path).name)
+            return real(path, document, **kwargs)
+
+        monkeypatch.setattr(collect, "atomic_write_json", watched)
+        collect.write_artifact({"target_date": "2026-09-11", "announcements": []})
+        assert calls == ["2026-09-11.json"]
 
 
 # --- reading and validation ---------------------------------------------------
@@ -576,7 +603,6 @@ class TestRedaction:
             assert forbidden not in raw, forbidden
 
     def test_the_snapshot_carries_no_announcement_content(self, live_db):
-        document = status_snapshot.read() if config.status_snapshot_path().exists() else None
         db.start_run(live_db, TARGET, "timer")
         document = status_snapshot.read()
         blob = json.dumps(document)
@@ -658,11 +684,18 @@ class TestHealthSources:
         assert from_db["recent_runs"] == from_snapshot["recent_runs"]
         assert from_db["problems"] == from_snapshot["problems"]
         assert from_db["health"] == from_snapshot["health"]
+        # Both directions, so an invented extra metric is caught as well as a
+        # missing one.
         volatile = {"parking_cache_age_seconds"}
+        assert set(from_db["metrics"]) - volatile == (
+            set(from_snapshot["metrics"]) - volatile
+        )
         for key, value in from_db["metrics"].items():
             if key in volatile:
                 continue
-            assert from_snapshot["metrics"].get(key) == value, key
+            assert from_snapshot["metrics"][key] == value, key
+        # Length-checked, so a dropped component is not silently zipped away.
+        assert len(from_db["components"]) == len(from_snapshot["components"]) == 2
         for left, right in zip(from_db["components"], from_snapshot["components"]):
             for field in ("id", "name", "health", "summary", "last_attempt",
                           "last_success", "next_expected"):
@@ -896,8 +929,13 @@ class TestCollectorBoundary:
             shm.unlink()
         original = directory.stat().st_mode
         directory.chmod(original & ~0o222)
-        yield directory
-        directory.chmod(original)
+        try:
+            yield directory
+        finally:
+            # Explicitly, rather than relying on pytest resuming the generator.
+            # It does -- but one non-local edit between the chmod and the yield
+            # would leave a 0500 directory behind for every later test.
+            directory.chmod(original)
 
     def test_auto_returns_a_valid_contract_from_the_snapshot(self, boundary):
         document = health.build_status("auto")

@@ -862,10 +862,27 @@ def _cmd_status(args: argparse.Namespace) -> int:
 
 
 def _cmd_health(args: argparse.Namespace) -> int:
-    """Print the stable status contract without changing DailyMail state."""
+    """Print the stable status contract without changing DailyMail state.
+
+    Belt and braces around the whole builder. The contract's value to
+    ControlPanel is that it *always* answers: the original defect was a blank
+    document, and a traceback would be strictly worse -- no document at all,
+    arriving exactly when something else is already wrong. So an unexpected
+    failure anywhere below becomes a minimal, honest `unavailable` document
+    rather than a stack trace on stderr.
+    """
     from . import health
 
-    document = health.build_status(getattr(args, "source", "auto") or "auto")
+    source = getattr(args, "source", "auto") or "auto"
+    try:
+        document = health.build_status(source)
+    except Exception as exc:  # noqa: BLE001 - the probe must always answer
+        from . import redact
+
+        document = health.unavailable_status(
+            redact.safe_text(f"{type(exc).__name__}: {exc}")
+            or "status could not be built"
+        )
     print(json.dumps(document, sort_keys=True, separators=(",", ":")))
     return 0
 
@@ -908,7 +925,14 @@ def _cmd_status_snapshot(args: argparse.Namespace) -> int:
     finally:
         connection.close()
 
-    document = status_snapshot.read(path)
+    try:
+        document = status_snapshot.read(path)
+    except status_snapshot.SnapshotError as exc:
+        # Writing it worked and reading it back did not, which means what is on
+        # disk cannot be trusted. Say so rather than raising.
+        print(f"SNAPSHOT FAILED: wrote {path} but could not read it back: {exc}",
+              file=sys.stderr)
+        return 1
     if getattr(args, "json", False):
         print(json.dumps(document, sort_keys=True, indent=1))
         return 0
