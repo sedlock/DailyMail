@@ -526,7 +526,8 @@ class TestSnapshotValidation:
             (lambda d: d.pop("recent_runs"), "recent_runs"),
             (lambda d: d.update(recent_runs={}), "not a list"),
             (lambda d: d.update(statistics=[]), "not an object"),
-            (lambda d: d.update(recent_runs=[{"no": "run_id"}]), "malformed run"),
+            (lambda d: d.update(recent_runs=[{"no": "run_id"}]), "run entry is missing"),
+            (lambda d: d.update(recent_runs=["not-a-dict"]), "malformed run"),
         ],
     )
     def test_every_structural_defect_is_named_rather_than_zeroed(
@@ -932,3 +933,127 @@ class TestCollectorBoundary:
             assert document["recent_runs"]
         finally:
             snapshot_dir.chmod(original)
+
+
+class TestAHostileSnapshotCannotCrashOrLie:
+    """A status probe that raises is worse than the blank document it replaced.
+
+    Found by crafting snapshots by hand against the first implementation: a file
+    that passed the schema check but was missing a run column raised `KeyError`
+    straight out of `health`, because the loader handed unvalidated dicts to code
+    that subscripts them. `read()` now validates every row field by field, so an
+    untrustworthy snapshot is *reported* rather than believed or fatal.
+    """
+
+    @pytest.fixture
+    def crafted(self, live_db, monkeypatch):
+        def cantopen(*args, **kwargs):
+            raise sqlite3.OperationalError("unable to open database file")
+
+        monkeypatch.setattr(db, "connect_readonly", cantopen)
+        path = config.status_snapshot_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        def write(document):
+            path.write_text(json.dumps(document), encoding="utf-8")
+            return health.build_status("auto")
+
+        return write
+
+    BASE = {
+        "schema_version": status_snapshot.SCHEMA_VERSION,
+        "generated_at": "2026-09-12T00:00:00+00:00",
+        "statistics": {},
+        "recent_runs": [],
+    }
+
+    @pytest.mark.parametrize(
+        "name, document",
+        [
+            (
+                "a run entry missing every column but run_id",
+                {**BASE, "recent_runs": [{"run_id": 1}]},
+            ),
+            (
+                "a run entry whose fields are containers",
+                {
+                    **BASE,
+                    "recent_runs": [
+                        {name: [] for name in status_snapshot.RUN_COLUMNS}
+                    ],
+                },
+            ),
+            (
+                "a nested object smuggled into a run field",
+                {
+                    **BASE,
+                    "recent_runs": [
+                        {
+                            **{name: None for name in status_snapshot.RUN_COLUMNS},
+                            "status": {"a": {"b": {"c": [1] * 50}}},
+                        }
+                    ],
+                },
+            ),
+            (
+                "a malformed last_retrieval_success",
+                {**BASE, "last_retrieval_success": {"nope": 1}},
+            ),
+            (
+                "a malformed latest_delivery",
+                {**BASE, "latest_delivery": 12345},
+            ),
+            (
+                "a non-object parking_sources",
+                {**BASE, "parking_sources": "not-an-object"},
+            ),
+            (
+                "a statistic that is a container",
+                {**BASE, "statistics": {"runs": [1, 2, 3]}},
+            ),
+            (
+                "more runs than the bound allows",
+                {
+                    **BASE,
+                    "recent_runs": [
+                        {name: None for name in status_snapshot.RUN_COLUMNS}
+                        for _ in range(status_snapshot.RECENT_RUN_LIMIT + 5)
+                    ],
+                },
+            ),
+        ],
+    )
+    def test_a_crafted_snapshot_is_refused_rather_than_trusted_or_fatal(
+        self, crafted, name, document
+    ):
+        result = crafted(document)
+        # Never raises...
+        assert result["schema_version"] == "controlpanel.status.v1"
+        # ...never claims the snapshot worked...
+        assert result["status_data_source"] == "unavailable", name
+        # ...never invents data...
+        assert result["recent_runs"] == []
+        assert result["health"] == "unknown"
+        # ...and names both the database failure and the snapshot's own reason.
+        assert len(result["adapter_errors"]) == 2, result["adapter_errors"]
+
+    def test_a_statistic_that_is_not_a_number_is_dropped_not_published(
+        self, crafted
+    ):
+        """A string that looks like a count is not one, and is not a metric."""
+        result = crafted({**self.BASE, "statistics": {"runs": "9999"}})
+        assert result["status_data_source"] == "snapshot"
+        assert result["metrics"].get("database_runs") is None
+
+    def test_a_genuine_snapshot_still_passes_the_stricter_validation(self, live_db):
+        seed(
+            live_db,
+            runs=[{"status": "success", "email_status": "sent", "unique_count": 27}],
+            deliveries=[{"state": "sent", "sent_at": "2026-09-11T10:32:23+00:00"}],
+        )
+        document = status_snapshot.read()
+        assert document["recent_runs"][0]["unique_count"] == 27
+        for name in status_snapshot.RUN_COLUMNS:
+            assert name in document["recent_runs"][0]
+        for name in status_snapshot.DELIVERY_COLUMNS:
+            assert name in document["latest_delivery"]

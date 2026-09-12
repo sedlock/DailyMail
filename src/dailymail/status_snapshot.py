@@ -319,11 +319,63 @@ def read(path: Path | None = None) -> dict:
         raise SnapshotError("status snapshot recent_runs is not a list")
     if not isinstance(document["statistics"], dict):
         raise SnapshotError("status snapshot statistics is not an object")
+    if len(document["recent_runs"]) > RECENT_RUN_LIMIT:
+        raise SnapshotError(
+            f"status snapshot carries {len(document['recent_runs'])} runs, above "
+            f"the bound of {RECENT_RUN_LIMIT}"
+        )
+
+    # Every row is checked field by field before anything downstream touches it.
+    # `health` reads these with `row["column"]` and hands the values straight
+    # into the published contract, so a row that is merely *present* is not good
+    # enough: a missing key would raise out of a status probe, and a non-scalar
+    # value would be copied verbatim into a document another service consumes.
+    # A snapshot we cannot fully trust is reported as unusable, never partially
+    # believed.
     for entry in document["recent_runs"]:
-        if not isinstance(entry, dict) or "run_id" not in entry:
-            raise SnapshotError("status snapshot contains a malformed run entry")
+        _validate_row(entry, RUN_COLUMNS, "run")
+    for key in ("last_retrieval_success", "last_delivery_success"):
+        _validate_optional_row(document.get(key), RUN_COLUMNS, key)
+    for key in ("latest_delivery", "last_confirmed_delivery"):
+        _validate_optional_row(document.get(key), DELIVERY_COLUMNS, key)
+
+    sources = document.get("parking_sources")
+    if sources is not None and not isinstance(sources, dict):
+        raise SnapshotError("status snapshot parking_sources is not an object")
+
+    for name, value in document["statistics"].items():
+        if not isinstance(name, str) or not _is_scalar(value):
+            raise SnapshotError(
+                f"status snapshot statistic {name!r} is not a scalar"
+            )
 
     return document
+
+
+def _is_scalar(value: Any) -> bool:
+    """What may appear in a published status document: a number, text or null."""
+    return value is None or isinstance(value, (int, float, str, bool))
+
+
+def _validate_row(entry: Any, columns, label: str) -> None:
+    if not isinstance(entry, dict):
+        raise SnapshotError(f"status snapshot contains a malformed {label} entry")
+    missing = [name for name in columns if name not in entry]
+    if missing:
+        raise SnapshotError(
+            f"status snapshot {label} entry is missing {', '.join(sorted(missing))}"
+        )
+    for name in columns:
+        if not _is_scalar(entry[name]):
+            raise SnapshotError(
+                f"status snapshot {label} entry field {name!r} is not a scalar"
+            )
+
+
+def _validate_optional_row(entry: Any, columns, label: str) -> None:
+    if entry is None:
+        return
+    _validate_row(entry, columns, label)
 
 
 def describe_path() -> str:

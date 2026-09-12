@@ -618,12 +618,16 @@ def _load_from_snapshot(observed_at: str, timer: dict[str, Any]):
         # has never run, which is the one thing this must not say.
         return (*empty[:7], _safe_text(exc) or "Status snapshot is unavailable.")
 
+    # `status_snapshot.read` has already refused anything structurally wrong, so
+    # these are plain reads rather than defensive ones -- but statistics are
+    # filtered to numbers because they are published as metrics, and a string
+    # that happens to look like a count is not one.
     stats = {
         name: value
         for name, value in (document.get("statistics") or {}).items()
-        if isinstance(value, (int, float)) or value is None
+        if value is None or isinstance(value, (int, float))
     }
-    rows = [entry for entry in document.get("recent_runs") or [] if isinstance(entry, dict)]
+    rows = document.get("recent_runs") or []
     sources = document.get("parking_sources") or {}
     parking = {
         "oldest_verified_at": sources.get("oldest_verified_at"),
