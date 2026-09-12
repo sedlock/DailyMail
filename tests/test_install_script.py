@@ -81,10 +81,26 @@ def _run(tmp_path: Path, *args: str) -> tuple[subprocess.CompletedProcess[str], 
 
 
 def test_installer_requires_the_exact_authoritative_path(tmp_path):
+    """A copy of the installer outside the canonical path must refuse to run.
+
+    Deliberately tested against a *copy* rather than `REPOSITORY`: on the
+    production host the checkout genuinely is the canonical path, so running the
+    real script there is supposed to succeed. Asserting on a copy checks the
+    guard itself rather than where this checkout happens to live.
+    """
     environment, call_log = _environment(tmp_path)
+    elsewhere = tmp_path / "not-canonical"
+    (elsewhere / "scripts").mkdir(parents=True)
+    (elsewhere / "pyproject.toml").write_text("", encoding="utf-8")
+    (elsewhere / "uv.lock").write_text("", encoding="utf-8")
+    installer = elsewhere / "scripts" / "install.sh"
+    installer.write_text(INSTALLER.read_text(encoding="utf-8"), encoding="utf-8")
+    installer.chmod(installer.stat().st_mode | stat.S_IXUSR)
+    assert elsewhere.resolve() != Path(CANONICAL_REPOSITORY)
+
     result = subprocess.run(
-        [str(INSTALLER), "--status"],
-        cwd=REPOSITORY,
+        [str(installer), "--status"],
+        cwd=elsewhere,
         env=environment,
         text=True,
         capture_output=True,

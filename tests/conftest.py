@@ -2,15 +2,29 @@
 
 Tests run entirely against the sanitized Phase 0 fixtures and a mock HTTP
 transport. Nothing here touches the live Rowan service.
+
+Two layers, deliberately different in kind. The fixtures below *shape* what a
+test sees -- temporary XDG directories, fixture credentials, a stubbed
+collector, blocked parking and route lookups. `hermetic_boundary` separately
+*forbids* what no test may do, as a CPython audit hook that cannot be undone by
+anything, including `monkeypatch.undo()`. See that module for why the
+distinction turned out to matter.
 """
 
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import httpx
 import pytest
+
+import hermetic_boundary
+
+# Installed at import, before collection: the boundary has to already exist by
+# the time the first test body runs, and there is no way to remove it after.
+hermetic_boundary.install()
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = REPO_ROOT / "artifacts" / "reconnaissance" / "fixtures"
@@ -37,6 +51,28 @@ EXPECTED_STANDING_IDS_2026_08_20 = {
 MOCK_MODULE_VERSION = "MOCKmoduleVersion00000"
 MOCK_API_VERSION = "MOCKapiVersion0000000"
 MOCK_CSRF = "MOCKcsrfToken00000000="
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_protocol(item, nextitem):
+    """Refuse real egress for the whole normal suite; relax it only for probes.
+
+    A hook rather than an autouse fixture, because it has to wrap the item's
+    *whole* protocol. An autouse fixture is function-scoped, and higher-scoped
+    fixtures are set up before it runs -- so `test_parking_live.py`'s
+    module-scoped `fetched` fixture, whose entire job is to make live requests,
+    was fetching before the relaxation had been entered.
+
+    The boundary itself is process-wide and permanent; this only names the
+    current test in a refusal message, and steps aside for the two modules
+    documented as opt-in live probes, which skip themselves anyway unless their
+    own environment flag is set.
+    """
+    hermetic_boundary.enter_test(item.nodeid)
+    if item.path.name in hermetic_boundary.OPT_IN_LIVE_MODULES:
+        with hermetic_boundary.relaxed():
+            return (yield)
+    return (yield)
 
 
 @pytest.fixture(autouse=True)
@@ -441,6 +477,17 @@ def no_parking_network_or_subprocess(request, monkeypatch):
     monkeypatch.setattr(parking_agent, "_invoke_resolver", blocked_agent)
     monkeypatch.setattr(parking_agent, "_invoke_description_writer", blocked_agent)
 
+    # Same invariant for calendar travel: "a cached venue costs nothing" has to
+    # be a tested fact. A test that wants routing injects its own `router=`.
+    from dailymail import travel
+
+    def blocked_route(*args, **kwargs):
+        raise AssertionError(
+            "a route lookup was attempted from a test; inject a router instead"
+        )
+
+    monkeypatch.setattr(travel, "osrm_duration_seconds", blocked_route)
+
 
 @pytest.fixture
 def parking_fetcher() -> "OfflineParkingFetcher":
@@ -526,3 +573,183 @@ def parking_cache(settings_obj, parking_fetcher):
     )
     yield connection
     connection.close()
+
+
+# --- the calendar acceptance event -------------------------------------------
+#
+# Rowan announcement 6694, the Provost's Town Hall of 14 October 2026, verbatim
+# from production apart from trimmed styling. It is the interesting case because
+# Rowan's own `Event` boolean is FALSE for it: the date, the two-phase schedule,
+# the room and the hybrid note all live in the body. Any detection that leans on
+# that flag misses it entirely.
+
+REFERENCE = date(2026, 8, 28)
+
+# The real 6694 body, verbatim from production, trimmed only of styling noise.
+TOWN_HALL_BODY = (
+    "<h4><span><strong>Provost’s Town Hall &amp; Social</strong></span></h4>"
+    "<p>We welcome all faculty, staff, and managers to join us for a Town Hall on "
+    "Wednesday, October 14, 2026, where Provost Voki Pophristic will share "
+    "Academic/Student Affairs updates and open the floor to questions. Following "
+    "the session and Q&amp;A, we invite you to stay to enjoy some light "
+    "refreshments, build connections, and explore opportunities for "
+    "collaboration.</p>"
+    '<p><a href="https://rowan.co1.qualtrics.com/jfe/form/SV_cIRdpy6HaBFYqBU">'
+    "<strong><u>Register Here</u></strong></a> so that we can plan for seating "
+    "and refreshments.</p>"
+    "<p><strong>Date:</strong> Wednesday, October 14, 2026</p>"
+    "<p><strong>Times:</strong></p>"
+    "<ul><li>10:00 - 11:15 - Presentation and Q&amp;A</li>"
+    "<li>11:15 - 12:00 - Social</li></ul>"
+    "<p><strong>Location:</strong> Hybrid</p>"
+    "<ul><li>Chamberlain Student Center, Eynon Ballroom <i><strong>(in-person "
+    "preferred)</strong></i></li>"
+    "<li>WebEx <strong>(Register for the link)</strong></li></ul>"
+    "<p><strong>Who:</strong> This event is open to all faculty, staff, and "
+    "managers</p>"
+    '<p>If there are any topics you would like to hear about, please '
+    '<a href="https://rowan.co1.qualtrics.com/jfe/form/SV_4V0aCKxrPRWxvwO">'
+    "submit them anonymously here</a>.</p>"
+    "<p>Questions can be directed to Sarah Fobes.</p>"
+)
+
+TOWN_HALL_TEXT = """Provost’s Town Hall & Social
+We welcome all faculty, staff, and managers to join us for a Town Hall on Wednesday, October 14, 2026, where Provost Voki Pophristic will share Academic/Student Affairs updates and open the floor to questions. Following the session and Q&A, we invite you to stay to enjoy some light refreshments, build connections, and explore opportunities for collaboration.
+Register Here so that we can plan for seating and refreshments.
+Date: Wednesday, October 14, 2026
+Times:
+10:00 - 11:15 - Presentation and Q&A
+11:15 - 12:00 - Social
+
+Location: Hybrid
+Chamberlain Student Center, Eynon Ballroom (in-person preferred)
+WebEx (Register for the link)
+
+Who: This event is open to all faculty, staff, and managers
+If there are any topics you would like to hear about, please submit them anonymously here.
+Questions can be directed to Sarah Fobes."""
+
+
+def make_town_hall_row(**overrides) -> dict:
+    row = {
+        "submission_id": 6694,
+        "title": "Provost's Town Hall - Oct 14",
+        "full_body": TOWN_HALL_BODY,
+        "body_text": TOWN_HALL_TEXT,
+        "is_event": 0,
+        "event_name": None,
+        "event_date": None,
+        "event_start_time": None,
+        "event_end_time": None,
+        "event_location": None,
+        "category_title": "Glassboro Campus",
+        "source_audience": "Employees",
+        "content_hash": "hash-6694",
+        "official_url": "https://apps.rowan.edu/RowanAnnouncer/Announcement?SubmissionId=6694",
+    }
+    row.update(overrides)
+    return row
+
+
+# --- the 1 September 2026 regression fixtures ---------------------------------
+#
+# Four production announcements, captured verbatim into
+# `artifacts/qa/fixtures/render-regression.json` and loaded here so the Python
+# suite and the browser suite assert against exactly the same bytes:
+#
+#   6612  the colour leak       every paragraph wrapped in the design's own accent
+#   6736  the colour control    no source colour at all; renders correctly
+#   6702  the multi-session     two selectable sittings of one event
+#   6694  the single-session    one sitting, a real room, a travel hold
+#
+# Contact blocks are absent and body email addresses are redacted; the inline
+# colour declarations and the dated session lines are the source's own.
+
+RENDER_REGRESSION_PATH = (
+    REPO_ROOT / "artifacts" / "qa" / "fixtures" / "render-regression.json"
+)
+
+
+def _load_render_regression() -> dict[str, dict]:
+    document = json.loads(RENDER_REGRESSION_PATH.read_text(encoding="utf-8"))
+    return {
+        str(entry["submission_id"]): entry for entry in document["announcements"]
+    }
+
+
+RENDER_REGRESSION = _load_render_regression()
+
+PROFESSIONAL_BODY = RENDER_REGRESSION["6612"]["full_body"]
+PROFESSIONAL_TEXT = RENDER_REGRESSION["6612"]["body_text"]
+OSEC_BODY = RENDER_REGRESSION["6736"]["full_body"]
+OSEC_TEXT = RENDER_REGRESSION["6736"]["body_text"]
+COFFEE_HOURS_BODY = RENDER_REGRESSION["6702"]["full_body"]
+COFFEE_HOURS_TEXT = RENDER_REGRESSION["6702"]["body_text"]
+
+
+def regression_record(submission_id: str, **overrides) -> dict:
+    """One committed fixture in the shape `db.record_announcement` expects."""
+    entry = RENDER_REGRESSION[str(submission_id)]
+    record = {
+        "submission_id": int(entry["submission_id"]),
+        "title": entry["title"],
+        "full_body": entry["full_body"],
+        "body_text": entry["body_text"],
+        "source_audience": entry["source_audience"],
+        "category_id": entry["category_id"],
+        "distribution_dates": ["2026-09-01"],
+        "first_distribution_date": "2026-09-01",
+        "status": "New",
+        "is_event": entry.get("is_event") or 0,
+        "event_name": entry.get("event_name"),
+        "event_date": entry.get("event_date"),
+        "event_start_time": entry.get("event_start_time"),
+        "event_end_time": entry.get("event_end_time"),
+        "event_location": entry.get("event_location"),
+    }
+    record.update(overrides)
+    return record
+
+
+# --- boundary reporting -------------------------------------------------------
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Say out loud what the run did and did not reach.
+
+    An empty violation list is the run's own evidence for the three numbers an
+    operator cares about: real external connections, real SMTP attempts and
+    real production credential reads, all zero.
+    """
+    summary = hermetic_boundary.summary()
+    terminalreporter.section("hermetic boundary")
+    if not summary["installed"]:  # pragma: no cover - cannot happen via conftest
+        terminalreporter.write_line("NOT INSTALLED", red=True)
+        return
+    violations = summary["violations"]
+    if violations:
+        terminalreporter.write_line(
+            f"{len(violations)} real-access attempt(s) refused:", red=True
+        )
+        for entry in violations:
+            terminalreporter.write_line(
+                f"  {entry['kind']}: {entry['detail']}  [{entry['test']}]", red=True
+            )
+        return
+    terminalreporter.write_line(
+        "0 external connections, 0 SMTP attempts, 0 production credential reads, "
+        f"0 production state accesses ({summary['probes_blocked']} deliberate "
+        "boundary probe(s) refused as designed)"
+    )
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """A refused real access fails the run, even if every test passed.
+
+    The refusal already broke the test that attempted it, so this is belt and
+    braces -- except in the one case that matters most: an attempt made inside
+    code that catches broad exceptions, where the test could still pass with
+    the boundary having quietly saved it.
+    """
+    if hermetic_boundary.VIOLATIONS and exitstatus == 0:
+        session.exitstatus = 1

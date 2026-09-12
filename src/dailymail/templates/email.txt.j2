@@ -15,7 +15,7 @@ NEW -- {{ counts.new }} announcement{{ '' if counts.new == 1 else 's' }}
 {{ group.category|upper }}
 {{ '-' * 72 }}
 {% for item in group.announcements %}
-[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %} | {{ item.audience_label }}] {{ item.category_title }}
+[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %} | {{ item.audience_label }}]{% if item.show_category %} {{ item.category_title }}{% endif %}
 
 {{ item.title }}
 {% if item.event %}
@@ -31,6 +31,27 @@ PARKING LOCATION{{ 'S' if item.parking|length > 1 else '' }}
 {% else %}
   {{ spot.matched_text }}: parking location could not be resolved automatically.
   Official {{ spot.fallback_map_label }}: {{ spot.fallback_map_url }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if item.calendar %}
+
+CALENDAR
+  {{ item.calendar.title }}
+{% if item.calendar.location_line %}
+  {{ item.calendar.location_line }}
+{% endif %}
+{% if item.calendar.sessions_line %}
+  {{ item.calendar.sessions_line }}
+{% endif %}
+{% for session in item.calendar.sessions %}
+  {{ session.when_line }}
+    {{ session.button_label }}: {{ session.action_url }}
+{% if session.travel_line %}
+    {{ session.travel_line }}
+{% endif %}
+{% if session.attachment_line %}
+    {{ session.attachment_line }}
 {% endif %}
 {% endfor %}
 {% endif %}
@@ -49,7 +70,7 @@ Official announcement: {{ item.official_url }}
 STANDING -- {{ counts.standing }} continuing announcement{{ '' if counts.standing == 1 else 's' }}
 {{ '=' * 72 }}
 {% for item in standing_items %}
-[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %} | {{ item.audience_label }}] {{ item.category_title }}
+[{{ item.status|upper }}{% if item.changed %} | UPDATED{% endif %} | {{ item.audience_label }}]{% if item.show_category %} {{ item.category_title }}{% endif %}
 
 {{ item.title }}
 {% if item.event %}
@@ -65,6 +86,27 @@ PARKING LOCATION{{ 'S' if item.parking|length > 1 else '' }}
 {% else %}
   {{ spot.matched_text }}: parking location could not be resolved automatically.
   Official {{ spot.fallback_map_label }}: {{ spot.fallback_map_url }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if item.calendar %}
+
+CALENDAR
+  {{ item.calendar.title }}
+{% if item.calendar.location_line %}
+  {{ item.calendar.location_line }}
+{% endif %}
+{% if item.calendar.sessions_line %}
+  {{ item.calendar.sessions_line }}
+{% endif %}
+{% for session in item.calendar.sessions %}
+  {{ session.when_line }}
+    {{ session.button_label }}: {{ session.action_url }}
+{% if session.travel_line %}
+    {{ session.travel_line }}
+{% endif %}
+{% if session.attachment_line %}
+    {{ session.attachment_line }}
 {% endif %}
 {% endfor %}
 {% endif %}

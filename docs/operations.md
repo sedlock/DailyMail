@@ -1,8 +1,9 @@
 # DailyMail Operations (Phase 2 — production)
 
 Companion to `docs/site-reconnaissance.md` (Phase 0),
-`docs/collector-architecture.md` (Phase 1) and `docs/parking-enrichment.md`
-(Phase 3), all of which remain accurate. This document covers the production
+`docs/collector-architecture.md` (Phase 1), `docs/parking-enrichment.md`
+(Phase 3) and `docs/calendar-and-repeats.md` (Phase 4), all of which remain
+accurate. This document covers the production
 system: history, curation, rendering, delivery and scheduling.
 
 ---
@@ -18,8 +19,12 @@ overlap lock
   -> validate (Phase 1 gates V1-V9, V12)      structural failure = no retry
   -> persist to SQLite                        versions only on real change
   -> detect substantive updates
+  -> logical repeats                          already delivered under another ID?
+  -> event candidates                         which announcements are real events
   -> parking enrichment                       cache hit = a dictionary lookup
   -> curate (Claude; deterministic fallback on any failure)
+       ranking, plus calendar relevance on the same call
+  -> calendar enrichment                      Outlook link + .ics + travel holds
   -> render HTML + plain text deterministically
   -> verify the rendering, then the message
   -> send via Gmail STARTTLS (idempotent per date+recipient)
@@ -42,6 +47,8 @@ is two HTTP requests and under two seconds.
 | SMTP failure | Retried up to 3 times, then recorded and exit non-zero. Deliberately **no** alert email — that is the channel that just failed |
 | Already delivered today | Exits cleanly without resending |
 | Parking source unreachable, resolver failure, or an unresolvable lot | Recorded in `runs.parking_stats`; the announcement shows the official campus parking map instead. **No alert**, and the digest is unaffected |
+| Event parse failure, invalid model relevance output, unresolvable venue, route lookup failure, or calendar-link generation failure | Recorded in `runs.calendar_stats` and `calendar_recommendations`. At worst one announcement loses its calendar button; a routing failure only makes the travel estimate rougher. **No alert**, and the digest is unaffected |
+| Logical-repeat detection fails | The day is left exactly as Rowan classified it. **No alert** |
 
 ---
 
@@ -62,6 +69,7 @@ uv run dailymail health --json                   # read-only controlpanel.status
 uv run dailymail status --json                   # compatibility alias for the same JSON
 uv run dailymail db-status                       # schema, counts, categories, backups
 uv run dailymail render --date 2026-08-20 --inline-images --out /tmp/preview
+uv run dailymail render --date 2026-08-20 --no-calendar   # skip calendar enrichment
 uv run dailymail inspect --date 2026-08-20       # the collection artifact
 uv run dailymail collect --date 2026-08-20       # collect only, no DB or email
 
@@ -83,8 +91,23 @@ uv run dailymail parking-refresh --campus glassboro
 uv run dailymail parking-set glassboro:lot:o-1 --description "..." \
     --latitude 39.712482 --longitude -75.120453  # pinned manual correction
 
-# tests
-uv run pytest
+# logical repeat families and calendar sessions
+# (docs/logical-families-and-sessions.md)
+uv run dailymail families                        # every durable family
+uv run dailymail families --submission 6769      # one ID's family and evidence
+uv run dailymail families --recheck 2026-09-01   # re-resolve one date, read-only
+uv run dailymail families --recheck 2026-09-01 --apply    # persist + audit
+uv run dailymail sessions --date 2026-09-01      # detected calendar sittings
+uv run dailymail sessions --date 2026-09-01 --submission 6702 --ics
+
+# tests (§11 "The hermetic test boundary" for what the normal run may touch)
+uv run pytest                                    # hermetic, no network
+DAILYMAIL_LIVE_PARKING=1 uv run pytest tests/test_parking_live.py
+DAILYMAIL_VISUAL_QA=1 uv run pytest tests/test_visual_qa.py
+
+# browser rendering QA (diagnostics only, never on the production path)
+uv run python tools/qa/build_page.py
+node tools/qa/visual-regression.mjs
 ```
 
 ### Logs and scheduling
@@ -296,7 +319,7 @@ dropping below the three most recent).
 
 ---
 
-## 4. Database schema (version 2)
+## 4. Database schema (version 4)
 
 Plain `sqlite3`: foreign keys on, WAL, 10 s busy timeout, explicit transactions.
 One integer version in `schema_meta`; no migration framework.
@@ -318,11 +341,31 @@ One integer version in `schema_meta`; no migration framework.
 | `parking_landmarks` | Named campus features, for description evidence and campus disambiguation |
 | `announcement_parking_locations` | Which announcement referenced which lot, on which date, how it matched |
 | `parking_unresolved` | Candidates that could not be resolved, with attempt counts and reasons |
+| `event_venues` | One durable row per normalized venue: coordinate, provenance, travel mode, outbound/return minutes, routing source and fingerprint |
+| `calendar_recommendations` | One row per (date, announcement): candidate evidence, offer decision, relevance score/reason/method, attendance mode, title, event times, travel, mechanism, action URL, validation status, withheld reason |
+| `repeat_matches` | Which prior SubmissionId a repost was matched to, with method, confidence, similarity, evidence and its durable family |
+| `logical_announcement_families` | One durable family per logical announcement: key, canonical SubmissionId, normalized title, category, audience, member count, confidence, method |
+| `logical_announcement_members` | Which SubmissionIds belong to a family, what each matched, and which one is canonical |
+| `display_status_corrections` | Append-only audit of retrospective changes to what the digest shows, and of a skipped repeat stage (`submission_id = 0`) |
 
-`runs.parking_stats` holds one JSON object of per-run parking counters. The
-upgrade from version 1 is additive — `CREATE TABLE IF NOT EXISTS` plus one
-`ALTER TABLE runs ADD COLUMN` — transactional, idempotent, and it neither
-rewrites nor reads any existing announcement row.
+`runs.parking_stats` and `runs.calendar_stats` each hold one JSON object of
+per-run counters. `calendar_recommendations.session_count` and `.sessions` record
+how many selectable sittings an announcement offered and what each one carries.
+`daily_records.display_status` holds what the digest shows;
+`daily_records.status` keeps Rowan's own classification and is never
+overwritten. Every upgrade is additive — `CREATE TABLE IF NOT EXISTS` plus
+guarded `ALTER TABLE ... ADD COLUMN` — transactional, idempotent, and it
+neither rewrites nor reads any existing announcement row.
+
+**Temp storage is pinned to memory** (`PRAGMA temp_store = MEMORY`) on every
+connection. This is not a performance tweak: SQLite's default writes a
+materialized sort or GROUP BY spill to a file in `$TMPDIR`, and on
+1 September 2026 the filesystem holding this host's `TMPDIR` was mounted
+read-only across the 06:30 run. The spill failed, `SQLITE_CANTOPEN` surfaced as
+"unable to open database file", and the entire logical-repeat stage was skipped
+for that day's digest. A working database plus an unwritable, unrelated temp
+directory must not be able to change what the reader is told.
+See `docs/logical-families-and-sessions.md` §1.
 
 ### Substantive change detection
 
@@ -339,7 +382,7 @@ The per-day `changed` flag is sticky: re-running a date keeps the badge.
 
 ## 5. New versus Standing
 
-Unchanged from Phase 1 and still source-driven:
+Derivation is unchanged from Phase 1 and still source-driven:
 
 ```
 New       when min(DistributionDates) == digest date
@@ -349,6 +392,19 @@ Standing  otherwise
 `first_observed_at` is stored separately and is never used for this
 classification. Validated 13/13 against Rowan's own Employee Daily Mail for
 2026-08-20.
+
+Phase 4 adds one **separate** question on top, asked only of announcements Rowan
+calls New: *has this reader already been sent this, under a different
+SubmissionId?* Rowan submitters routinely repost rather than extend a
+distribution list — nine announcements did so in the first production week — so
+identical text arrives labelled New days after the reader received it.
+
+A conservative deterministic check (identical normalized title, same category
+and audience, body similarity ≥ 0.85, compatible event occurrence, and almost no
+distinctive words lost) sets `display_status = 'Standing'`. A genuinely new
+occurrence of a recurring event stays New, and anything ambiguous stays New.
+Rowan's own classification is preserved in `daily_records.status`.
+`docs/calendar-and-repeats.md` §6.
 
 ---
 
@@ -502,6 +558,26 @@ parts. Anything undecodable, insecure, or over budget is replaced with a visible
 digest. Measured: the 1.21 MB inline image in announcement 6602 became a 91 KB
 JPEG at 1500×600.
 
+### Calendar action
+
+An announcement describing a genuinely relevant scheduled event gets one compact
+`CALENDAR` block between its metadata and its body: the event name, `Wed, Oct 14
+· 10:00 AM–12:00 PM`, the location and attendance mode, an `Add to Calendar`
+button, and a line stating any travel reserved. The button is an Outlook
+compose deep link; a standards-compliant `.ics` is attached beside it, carrying
+the travel holds as separate VEVENTs. The plain-text alternative carries
+`Add to calendar: <URL>` and the attachment name. Like parking, the block is
+additive and is deliberately **not** part of the digest content hash. Full
+detail in `docs/calendar-and-repeats.md`.
+
+### Duplicate title and category
+
+Rowan bodies often open by repeating their own subject, which the card already
+shows. That first block is suppressed at render time only, and only on an exact
+normalized match with no link, image or extra text — the stored `full_body` is
+never modified. A New card inside a category group does not repeat the group's
+category; a Standing card, which sits in one globally ranked list, keeps it.
+
 ### Parking location
 
 An announcement naming a parking facility gets one compact block between its
@@ -550,6 +626,45 @@ curation payload; the test suite sweeps every text column in the database.
 Published contact, submitter and approver details **are** retained — they are
 part of the announcement as Rowan publishes it and appear in the digest.
 
+### The hermetic test boundary
+
+`uv run pytest` must reach nothing real, and that is enforced rather than
+intended. `tests/hermetic_boundary.py` installs a CPython audit hook at
+collection time and refuses, before the operation happens, any attempt to:
+
+* resolve or connect to anything but loopback — which is what reaching
+  `apps.rowan.edu` or `smtp.gmail.com` requires;
+* open an SMTP conversation at all;
+* open anything under the real `~/.config/dailymail`,
+  `~/.local/share/dailymail` or `~/.local/state/dailymail`, which covers the
+  production database, the run lock, the collection artifacts and the App
+  Password;
+* `sqlite3.connect` the production database;
+* run `systemctl`/`loginctl`/`journalctl` or the production entrypoint;
+* write to, rename, unlink or relink anything under
+  `/mnt/bench/releases/dailymail`.
+
+An audit hook is used deliberately: there is no API to remove one, so unlike a
+fixture it cannot be dropped by the test it is protecting. The suite's own
+fixtures — temporary XDG directories, fixture credentials, the stubbed
+collector and SMTP, the blocked parking and route lookups — *shape* what a test
+sees; the boundary *forbids* what no test may do. Every run prints what it
+reached, and a refused access fails the run even if every test passed.
+
+`monkeypatch.undo()` is forbidden in a test body, and
+`tests/test_hermetic_boundary_regression.py` fails if it reappears. It reverts
+the whole scope's patch stack, including every autouse fixture's, so it can
+only ever remove more than the caller installed; a test that wants one patch to
+stop applying wants `monkeypatch.context()`. This is not theoretical — a
+`monkeypatch.undo()` in `test_a_calendar_failure_never_costs_the_digest` had
+the pipeline running against the operator's real state directory, the real
+Rowan endpoint and the real Gmail credentials, and was what ControlPanel's
+release gate refused to validate.
+
+The two opt-in live modules (`test_parking_live.py`, `test_visual_qa.py`) exist
+to make real requests and are exempted; they skip themselves unless their own
+environment flag is set.
+
 ---
 
 ## 12. Troubleshooting
@@ -582,6 +697,30 @@ uv run dailymail render --date 2026-08-21 --inline-images --out /tmp/preview
 `--inline-images` converts CID parts back to data URIs so the file opens in a
 browser.
 
+**An announcement was labelled NEW that the reader has already been sent.**
+```sh
+uv run dailymail status                          # look for a skipped stage
+uv run dailymail families --recheck <date>       # read-only: what would change
+uv run dailymail families --recheck <date> --apply
+```
+`status` prints `ATTENTION: the stage was skipped on N date(s)` when
+logical-repeat resolution failed for a day, with the exception text. `--recheck`
+re-resolves that date and `--apply` persists the corrections; neither touches
+Rowan's own `status`, rewrites run history, or resends anything.
+See `docs/logical-families-and-sessions.md` §1.
+
+**An announcement rendered in the wrong colour.**
+```sh
+uv run python tools/qa/build_page.py
+node tools/qa/visual-regression.mjs --full-page
+ls artifacts/qa/screenshots/
+```
+The browser QA suite measures the *computed* colour of body prose, headings and
+links at three viewports and under a dark-mode approximation, which is the class
+of defect a string assertion cannot see. To check a live date instead, render it
+and grep the derivative: every colour in the email should be one DailyMail chose,
+and no `rgb(...)` declaration should survive.
+
 ---
 
 ## 13. Known limitations
@@ -596,6 +735,28 @@ browser.
 * If Rowan edits an announcement's distribution dates after publication, the
   derived `New`/`Standing` status can shift between runs. `first_distribution_date`
   is stored so this is detectable.
+* The `Add to Calendar` button uses Outlook's compose deep link, which Microsoft
+  has not documented. That is why it is paired with a standards-based `.ics`
+  attachment rather than relied on alone; if the endpoint ever changes, the
+  attachment still works. Only the attachment can carry travel holds — the
+  compose link takes a single event.
+* Travel routing uses the public OSRM demo endpoint, at most once per newly seen
+  venue. It is deliberately not a dependency: a failure yields a conservative
+  distance-based estimate, tagged as estimated in the callout.
 * Images are re-encoded as JPEG flattened onto white. That suits the white email
   background and text-heavy flyers; a logo relying on transparency over a dark
   background would look different from the source.
+* Author-supplied text colours are dropped from announcement bodies at render
+  time. The stored source keeps them, and every other inline style the author
+  asked for survives — but a colour that is meaningful in the source is lost.
+  That is a deliberate trade: an announcement painted three points from the
+  design's own accent rendered as one long headline in Outlook mobile's dark
+  mode. See `docs/logical-families-and-sessions.md` §4.
+* Outlook mobile dark mode is *approximated* in browser QA by a uniform CSS
+  inversion, not reproduced. It reproduces the property that broke — body prose
+  and the headline must stay distinct colours — but is not Outlook's exact
+  transform, and no host here can run Outlook to check.
+* A durable repeat family's member list grows forward from the point detection
+  first matched two IDs. The canonical original is always a member, which is
+  what a future repost resolves against, but the list is not a complete history
+  of the announcement.

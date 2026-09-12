@@ -21,9 +21,14 @@
           <td style="background:#ffffff;border:1px solid #b9b9b9;padding:2px 7px 3px 7px;font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:10px;line-height:12px;font-weight:bold;color:#444444;letter-spacing:1px;white-space:nowrap;">{{ item.audience_label }}</td>
         </tr></table>
       </td>
+      {#- The category is shown only where the surrounding context does not
+          already state it. A New card sits under its own category heading;
+          a Standing card is in one globally ranked list and needs the label. -#}
+      {%- if item.show_category %}
       <td class="stack cat-right" align="right" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;color:#6b6b6b;white-space:nowrap;padding-left:8px;">
         {{ item.category_title }}
       </td>
+      {%- endif %}
     </tr></table>
 
     {#- subject: the primary link -#}
@@ -43,8 +48,9 @@
     </table>
     {%- endif %}
 
-    {#- parking enrichment: additive, between metadata and the original body -#}
+    {#- enrichment blocks: additive, between metadata and the original body -#}
 {% include 'parking.html.j2' %}
+{% include 'calendar.html.j2' %}
 
     {#- complete announcement body, sanitized -#}
     <div class="body-copy" style="font-family:-apple-system,'Segoe UI',Segoe,Roboto,Arial,Helvetica,sans-serif;font-size:15px;line-height:1.52;color:#1a1a1a;padding:6px 0 2px 0;">

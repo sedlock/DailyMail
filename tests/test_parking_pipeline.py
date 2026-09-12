@@ -16,6 +16,11 @@ from dailymail import cli, daily, db, mailer, parking_enrich, parking_refresh, p
 
 from conftest import TARGET_DATE, OfflineParkingFetcher, artifact_from_fixtures, stub_description_runner
 
+# Captured at import, before any fixture has patched the module attribute: the
+# genuine production entry point, for the one test that has to call it rather
+# than the offline delegate `parked_pipeline` installs over it.
+REAL_PARKING_ENRICH = parking_enrich.enrich_digest
+
 
 @pytest.fixture
 def parked_pipeline(monkeypatch, settings_obj, employee_fixture, student_fixture):
@@ -35,7 +40,7 @@ def parked_pipeline(monkeypatch, settings_obj, employee_fixture, student_fixture
     )
     monkeypatch.setattr(
         daily.curate, "curate",
-        lambda rows, target_date, settings: daily.curate.CurationOutcome(
+        lambda rows, target_date, settings, **kwargs: daily.curate.CurationOutcome(
             method="fallback", model=None,
             entries=daily.curate.fallback_rank(rows, target_date, settings),
             error="stubbed",
@@ -58,6 +63,21 @@ def parked_pipeline(monkeypatch, settings_obj, employee_fixture, student_fixture
 # --- the digest ---------------------------------------------------------------
 
 
+def _decoded_body(prepared) -> str:
+    """Every text part of the message, decoded.
+
+    Deliberately not `message.as_string()`: that returns the quoted-printable
+    *encoding*, where a soft line break can fall in the middle of any phrase, so
+    a substring assertion against it passes or fails on payload length rather
+    than on content.
+    """
+    return "\n".join(
+        part.get_content()
+        for part in prepared.message.walk()
+        if part.get_content_maintype() == "text"
+    )
+
+
 def test_a_run_with_an_empty_catalog_bootstraps_and_enriches(parked_pipeline, settings_obj):
     """First run after the upgrade: the catalog is empty, O-1 is a miss, and the
     miss path fills the cache and enriches the same digest."""
@@ -71,7 +91,7 @@ def test_a_run_with_an_empty_catalog_bootstraps_and_enriches(parked_pipeline, se
     assert result.parking["new_resolutions"] == 1
     assert result.parking["resolver_calls"] == 0
 
-    body = sent[0].message.as_string()
+    body = _decoded_body(sent[0])
     assert "PARKING LOCATION" in body
     assert "Lot O-1" in body
 
@@ -221,22 +241,31 @@ def test_a_parking_failure_still_delivers_a_complete_digest(
     def broken(connection, rows, **kwargs):
         raise RuntimeError("parking subsystem is on fire")
 
-    monkeypatch.setattr(daily.parking_enrich, "enrich_digest", broken)
-    with pytest.raises(RuntimeError):
-        daily.run_daily(target_date=TARGET_DATE, settings=settings_obj)
+    # A bounded patch scope. This test used to install `broken` on the shared
+    # `monkeypatch` and then call `monkeypatch.undo()` to get rid of it, which
+    # also discarded `parked_pipeline`'s stubs and `conftest`'s autouse
+    # protections -- so the `db.connect()` below opened the operator's real
+    # production database and `db.initialize` migrated it. See
+    # `tests/hermetic_boundary.py`.
+    with monkeypatch.context() as broken_entry_point:
+        broken_entry_point.setattr(daily.parking_enrich, "enrich_digest", broken)
+        with pytest.raises(RuntimeError):
+            daily.run_daily(target_date=TARGET_DATE, settings=settings_obj)
 
     # The pipeline itself must not swallow a programming error, but the real
-    # entry point never raises: verify that directly.
-    monkeypatch.undo()
+    # entry point never raises: verify that directly. `REAL_PARKING_ENRICH` is
+    # captured at import, so this is genuinely the unwrapped production
+    # function and not the fixture's offline delegate.
     connection = db.connect()
     db.initialize(connection)
     try:
-        callouts, metrics = parking_enrich.enrich_digest(
+        callouts, metrics = REAL_PARKING_ENRICH(
             connection, [], target_date=TARGET_DATE, settings=settings_obj
         )
     finally:
         connection.close()
     assert callouts == {}
+    assert metrics.errors == []
 
 
 def test_a_parking_source_outage_does_not_alert_or_fail(
@@ -260,7 +289,7 @@ def test_a_parking_source_outage_does_not_alert_or_fail(
     )
     monkeypatch.setattr(
         daily.curate, "curate",
-        lambda rows, target_date, settings: daily.curate.CurationOutcome(
+        lambda rows, target_date, settings, **kwargs: daily.curate.CurationOutcome(
             method="fallback", model=None,
             entries=daily.curate.fallback_rank(rows, target_date, settings),
         ),
@@ -286,7 +315,7 @@ def test_a_parking_source_outage_does_not_alert_or_fail(
     assert result.parking["unresolved"] == 1
     assert result.parking["errors"]
 
-    body = sent[0].message.as_string()
+    body = _decoded_body(sent[0])
     # The complete digest still goes out, with the compact honest fallback and
     # no invented geography.
     assert "Parking Lot O-1 will be closed" in body

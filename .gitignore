@@ -36,3 +36,11 @@ collections/
 dist/
 *.egg-info/
 .pytest_cache/
+
+# Browser QA output. The *fixtures* under artifacts/qa/fixtures/ ARE committed --
+# they are the regression cases. The generated page and its screenshots are not:
+# they are reproducible from the fixtures in one command, they are large, and a
+# screenshot of a real digest shows announcement content and published contact
+# details that the fixtures themselves deliberately omit.
+artifacts/qa/pages/
+artifacts/qa/screenshots/

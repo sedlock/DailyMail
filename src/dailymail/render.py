@@ -26,6 +26,15 @@ TEMPLATE_DIR = str(Path(__file__).parent / "templates")
 
 AUDIENCE_LABELS = {"Employees": "EMPLOYEE", "Students": "STUDENT", "Both": "EVERYONE"}
 
+# The digest palette, in one place. `email.html.j2` declares the same values for
+# its own chrome; these are the ones imposed on *announcement body copy* so an
+# author's inline colour cannot repaint a card (see `sanitize.BodyColorPolicy`).
+BODY_INK = "#1a1a1a"
+BODY_ACCENT = "#57150B"
+BODY_COLOR_POLICY = sanitize.BodyColorPolicy(
+    body=BODY_INK, heading=BODY_ACCENT, link=BODY_ACCENT
+)
+
 
 @dataclass
 class RenderedDigest:
@@ -43,6 +52,10 @@ class RenderedDigest:
     links_dropped: int = 0
     parking_callouts: int = 0
     parking_unresolved: int = 0
+    calendar_callouts: int = 0
+    calendar_session_actions: int = 0
+    calendar_attachments: list = field(default_factory=list)
+    duplicate_titles_suppressed: int = 0
 
 
 def _environment() -> Environment:
@@ -106,11 +119,13 @@ def build_items(
     settings: Settings,
     processor: ImageProcessor,
     parking: dict[str, list] | None = None,
+    calendar: dict | None = None,
 ):
     """Turn database rows into render-ready items, sanitizing bodies as we go."""
     items: dict[str, dict] = {}
     total_normalized = 0
     total_dropped = 0
+    suppressed_titles = 0
 
     for row in rows:
         submission_id = str(row["submission_id"])
@@ -119,9 +134,34 @@ def build_items(
         safe_html, link_stats, _seen = sanitize.sanitize_body(
             row["full_body"] or "",
             image_resolver=processor.resolver_for(submission_id, official_url),
+            # Render-time only. The stored `full_body` keeps every source colour
+            # byte for byte; the digest imposes its own inside the card.
+            color_policy=BODY_COLOR_POLICY,
         )
         total_normalized += len(link_stats.normalized)
         total_dropped += link_stats.dropped
+
+        # Render-time only. The stored `full_body` is authoritative and is never
+        # rewritten; this drops a leading block that merely repeats a headline
+        # the card already shows above it.
+        title = clean_subject(row["title"])
+        action = (calendar or {}).get(submission_id)
+        # Two headlines can precede the body: the card's own subject, and -- when
+        # an event earned one -- the calendar callout's event name. A first body
+        # block that exactly repeats either is redundant either way.
+        headlines = [title]
+        if action is not None and action.title and action.title != title:
+            headlines.append(action.title)
+
+        title_removed = False
+        for headline in headlines:
+            safe_html, removed = sanitize.suppress_duplicate_heading(
+                safe_html, headline
+            )
+            if removed:
+                title_removed = True
+                suppressed_titles += 1
+                break
 
         meta_lines: list[dict] = []
         contact = _person_line(
@@ -160,10 +200,21 @@ def build_items(
                 }
 
         body_text = (row["body_text"] or "").strip() or html_to_text(row["full_body"] or "")
+        # The plain-text alternative is derived separately, so it is checked
+        # independently: an entity or a wrapper tag can make the HTML block fail
+        # the match while the text line matches cleanly, or the reverse.
+        for headline in headlines:
+            body_text, removed = sanitize.suppress_duplicate_text_heading(
+                body_text, headline
+            )
+            if removed:
+                if not title_removed:
+                    suppressed_titles += 1
+                break
 
         items[submission_id] = {
             "submission_id": submission_id,
-            "title": clean_subject(row["title"]),
+            "title": title,
             "official_url": official_url,
             "status": row["status"],
             "changed": bool(row["changed"]),
@@ -191,9 +242,16 @@ def build_items(
             # part of `content_hash`: it is reference data about the announcement,
             # not the announcement's own published content.
             "parking": list((parking or {}).get(submission_id) or []),
+            # Additive, like parking: reference data about the announcement, not
+            # the announcement's own published content, and never hashed.
+            "calendar": action,
+            # Context-aware: a card inside a category group does not repeat the
+            # group's own heading. Grouping flips this off; anything rendered
+            # outside a group keeps its category.
+            "show_category": True,
         }
 
-    return items, total_normalized, total_dropped
+    return items, total_normalized, total_dropped, suppressed_titles
 
 
 def group_new(items: dict[str, dict]) -> list[dict]:
@@ -216,6 +274,10 @@ def group_new(items: dict[str, dict]) -> list[dict]:
             key=lambda item: (item["model_rank"], -int(item["submission_id"])),
         )
         if entries:
+            for entry in entries:
+                # The group heading above already states the category; repeating
+                # it on every card is noise.
+                entry["show_category"] = False
             groups.append({"category": title, "priority": priority, "announcements": entries})
     return groups
 
@@ -223,6 +285,10 @@ def group_new(items: dict[str, dict]) -> list[dict]:
 def order_standing(items: dict[str, dict]) -> list[dict]:
     """Standing is a single globally ranked list."""
     standing = [item for item in items.values() if item["status"] == "Standing"]
+    for item in standing:
+        # Standing is one globally ranked list with no category headings, so a
+        # Standing card must keep its own category label.
+        item["show_category"] = True
     return sorted(
         standing, key=lambda item: (item["model_rank"], -int(item["submission_id"]))
     )
@@ -250,10 +316,11 @@ def render_digest(
     settings: Settings,
     http_client=None,
     parking: dict[str, list] | None = None,
+    calendar: dict | None = None,
 ) -> RenderedDigest:
     processor = ImageProcessor(settings, http_client=http_client)
-    items, normalized, dropped = build_items(
-        rows, ordering, settings, processor, parking=parking
+    items, normalized, dropped, suppressed_titles = build_items(
+        rows, ordering, settings, processor, parking=parking, calendar=calendar
     )
 
     new_groups = group_new(items)
@@ -325,4 +392,23 @@ def render_digest(
         parking_unresolved=sum(
             1 for spots in (parking or {}).values() for spot in spots if not spot.resolved
         ),
+        calendar_callouts=sum(
+            1 for sid in ordered_ids if items[sid].get("calendar") is not None
+        ),
+        calendar_session_actions=sum(
+            items[sid]["calendar"].session_count
+            for sid in ordered_ids
+            if items[sid].get("calendar") is not None
+        ),
+        # One attachment per offered *session*, in the order the reader sees the
+        # buttons, so a two-session announcement arrives with two unambiguously
+        # named files rather than one that answers for both.
+        calendar_attachments=[
+            session
+            for sid in ordered_ids
+            if items[sid].get("calendar") is not None
+            for session in items[sid]["calendar"].sessions
+            if session.ics_text
+        ],
+        duplicate_titles_suppressed=suppressed_titles,
     )

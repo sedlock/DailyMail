@@ -44,9 +44,9 @@ def make_record(**overrides) -> LocationRecord:
 # --- schema ------------------------------------------------------------------
 
 
-def test_schema_version_is_two_and_parking_tables_exist(settings_obj):
+def test_schema_version_is_current_and_parking_tables_exist(settings_obj):
     connection = db.connect()
-    assert db.initialize(connection) == 2
+    assert db.initialize(connection) == db.SCHEMA_VERSION
     tables = {
         row["name"]
         for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -65,9 +65,9 @@ def test_schema_version_is_two_and_parking_tables_exist(settings_obj):
 
 def test_initialize_is_idempotent(settings_obj):
     connection = db.connect()
-    assert db.initialize(connection) == 2
-    assert db.initialize(connection) == 2
-    assert db.initialize(connection) == 2
+    assert db.initialize(connection) == db.SCHEMA_VERSION
+    assert db.initialize(connection) == db.SCHEMA_VERSION
+    assert db.initialize(connection) == db.SCHEMA_VERSION
     connection.close()
 
 
@@ -96,8 +96,8 @@ def test_upgrade_from_a_real_v1_database_preserves_history(settings_obj, tmp_pat
         )
     assert db.schema_version(connection) == 1
 
-    assert db.initialize(connection) == 2
-    assert db.schema_version(connection) == 2
+    assert db.initialize(connection) == db.SCHEMA_VERSION
+    assert db.schema_version(connection) == db.SCHEMA_VERSION
     # History intact.
     assert connection.execute(
         "SELECT COUNT(*) FROM announcements WHERE submission_id = 6622"
@@ -690,7 +690,7 @@ def test_database_backup_includes_the_parking_schema_and_data(parking_cache, set
         assert int(
             restored.execute("SELECT value FROM schema_meta WHERE key='schema_version'")
             .fetchone()[0]
-        ) == 2
+        ) == db.SCHEMA_VERSION
         assert restored.execute("SELECT COUNT(*) FROM parking_locations").fetchone()[0] > 40
         assert restored.execute("SELECT COUNT(*) FROM parking_aliases").fetchone()[0] > 100
         assert restored.execute("SELECT COUNT(*) FROM parking_sources").fetchone()[0] == len(

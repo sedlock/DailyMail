@@ -11,6 +11,18 @@ MIME shape (what Outlook wants for inline images):
       +- multipart/related
            +- text/html
            +- image/jpeg  (Content-ID: <cid>)
+
+When an announcement earns a calendar action, one `.ics` per event is attached
+and the whole thing becomes `multipart/mixed` with the above as its first part.
+
+The attachments are deliberately `application/octet-stream`, not `text/calendar`.
+[MS-STANOICAL] documents both halves of why: Outlook itself exports `.ics` files
+attached to mail as `application/octet-stream` and reserves `text/calendar` for
+iMIP scheduling data, and V0343 confirms that when several parts carry iMIP data
+Outlook treats only the *first* as scheduling and the rest as attachments. Using
+`text/calendar` here would turn a newsletter into a meeting request and silently
+demote every event after the first. This way the digest stays a digest, and
+opening an attachment imports every VEVENT in it -- travel holds included.
 """
 
 from __future__ import annotations
@@ -26,6 +38,10 @@ from .errors import DailyMailError
 from .images import EmbeddedImage
 from .settings import Settings
 
+# One `.ics` is ~2 KB. This is a backstop against a pathological day, not a
+# working limit: the calendar action count is already capped in configuration.
+MAX_CALENDAR_ATTACHMENT_BYTES = 512 * 1024
+
 
 class SmtpError(DailyMailError):
     exit_code = 9
@@ -37,6 +53,8 @@ class PreparedMessage:
     message_id: str
     size_bytes: int
     image_count: int
+    calendar_count: int = 0
+    calendar_filenames: tuple[str, ...] = ()
 
     @property
     def subject(self) -> str:
@@ -51,6 +69,7 @@ def build_message(
     html: str,
     text: str,
     images: list[EmbeddedImage],
+    calendar_attachments: list | None = None,
 ) -> PreparedMessage:
     """Assemble the multipart message. No network, no credentials."""
     message = EmailMessage()
@@ -80,13 +99,56 @@ def build_message(
                 filename=f"{image.cid.split('@')[0]}.jpg",
             )
 
+    filenames = _attach_calendars(message, calendar_attachments or [])
+
     raw = message.as_bytes()
     return PreparedMessage(
         message=message,
         message_id=message_id,
         size_bytes=len(raw),
         image_count=len(images),
+        calendar_count=len(filenames),
+        calendar_filenames=tuple(filenames),
     )
+
+
+def _attach_calendars(message: EmailMessage, actions: list) -> list[str]:
+    """Attach one `.ics` per calendar action. Never fails the message.
+
+    A calendar file that cannot be attached costs that one attachment; the
+    digest is unaffected, which is the whole point of treating this as
+    enrichment rather than content.
+    """
+    filenames: list[str] = []
+    used: set[str] = set()
+    budget = MAX_CALENDAR_ATTACHMENT_BYTES
+    for action in actions:
+        payload = getattr(action, "ics_bytes", None)
+        filename = getattr(action, "ics_filename", None)
+        if not payload or not filename:
+            continue
+        if len(payload) > budget:
+            break
+        # Distinct names, so two events cannot arrive as one ambiguous file.
+        candidate, index = filename, 2
+        while candidate in used:
+            stem = filename[: -len(".ics")]
+            candidate = f"{stem}-{index}.ics"
+            index += 1
+        # Belt and braces against header injection: the filename has already
+        # been slugified, and anything still unusable is simply skipped.
+        if any(char in candidate for char in ("\r", "\n", '"', "/", "\\")):
+            continue
+        message.add_attachment(
+            payload,
+            maintype="application",
+            subtype="octet-stream",
+            filename=candidate,
+        )
+        used.add(candidate)
+        filenames.append(candidate)
+        budget -= len(payload)
+    return filenames
 
 
 def build_alert_message(
