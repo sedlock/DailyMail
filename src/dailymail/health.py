@@ -11,21 +11,27 @@ import json
 import re
 import sqlite3
 import subprocess
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import db, systemd_units
+from . import db, redact, systemd_units
 
 SCHEMA_VERSION = "controlpanel.status.v1"
 RECENT_RUN_LIMIT = 10
-_SENSITIVE_ASSIGNMENT = re.compile(
-    r"(?i)\b(?:access[_-]?token|api[_-]?key|authorization|credential|"
-    r"password|secret|token)\b\s*([=:])\s*(?!bearer\b)[^\s,;]+"
-)
-_BEARER_TOKEN = re.compile(r"(?i)\b(?:(authorization)\s*[:=]\s*)?(bearer)\s+[^\s,;]+")
-_URI_USERINFO = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^\s/@:]+:[^\s/@]+@")
-_EMAIL_ADDRESS = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
+
+# Where the history in this document came from.
+SOURCE_AUTO = "auto"
+SOURCE_DB = "database"
+SOURCE_SNAPSHOT = "snapshot"
+SOURCE_UNAVAILABLE = "unavailable"
+
+# A published metric key is `database_<name>`; bound the author-controlled half.
+_MAX_METRIC_NAME = 64
+
+
+class _SkipDatabase(Exception):
+    """Internal: `--source snapshot` must not open SQLite at all."""
 _ENABLED_TIMER_STATES = frozenset({"enabled", "enabled-runtime"})
 _PAUSED_TIMER_STATES = frozenset({"disabled", "disabled-runtime", "indirect"})
 
@@ -34,23 +40,14 @@ def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def _safe_text(value: object, *, limit: int = 300) -> str | None:
-    """Return an actionable, bounded error summary without secret material."""
-    if value is None:
-        return None
-    text = " ".join(str(value).split())
-    if not text:
-        return None
-    text = _URI_USERINFO.sub(r"\1[redacted]@", text)
+def _safe_text(value: object, *, limit: int = redact.DEFAULT_LIMIT) -> str | None:
+    """Return an actionable, bounded error summary without secret material.
 
-    def redact_bearer(match: re.Match[str]) -> str:
-        prefix = "Authorization: " if match.group(1) else ""
-        return f"{prefix}Bearer [redacted]"
-
-    text = _BEARER_TOKEN.sub(redact_bearer, text)
-    text = _SENSITIVE_ASSIGNMENT.sub("[redacted]", text)
-    text = _EMAIL_ADDRESS.sub("[redacted-email]", text)
-    return text[:limit]
+    The rules moved to `redact` so the status snapshot -- which is built from the
+    same `error_summary` columns and is printed by `status-snapshot show` -- is
+    scrubbed by the same implementation rather than a second one.
+    """
+    return redact.safe_text(value, limit=limit)
 
 
 def _parse_persisted_timestamp(value: object) -> datetime | None:
@@ -218,12 +215,12 @@ def _component(
     name: str,
     observed_at: str,
     timer: dict[str, Any],
-    latest: sqlite3.Row | None,
-    last_success: sqlite3.Row | None,
+    latest: Any,
+    last_success: Any,
     db_error: str | None,
     delivery: bool,
+    source: str = "DailyMail SQLite history and systemd user manager",
 ) -> dict[str, Any]:
-    source = "DailyMail SQLite history and systemd user manager"
     timer_health = _timer_health(timer.get("timer_enabled"))
     latest_status = latest["status"] if latest is not None else None
     email_status = latest["email_status"] if latest is not None else None
@@ -321,17 +318,45 @@ def _overall(components: list[dict[str, Any]]) -> tuple[str, str]:
     return chosen["health"], chosen["summary"]
 
 
-def build_status() -> dict[str, Any]:
-    """Return the stable ``controlpanel.status.v1`` document without writes."""
+def build_status(source: str = SOURCE_AUTO) -> dict[str, Any]:
+    """Return the stable ``controlpanel.status.v1`` document without writes.
+
+    ``source`` selects where the history comes from:
+
+    ``auto``
+        Read the live database; fall back to the published status snapshot when
+        that read fails. This is what production uses.
+    ``database``
+        Database only, never the snapshot. Diagnosis, and the test that proves
+        the failure being routed around is real.
+    ``snapshot``
+        Snapshot only, never opening SQLite at all. This is what proves the
+        ControlPanel collector boundary works with no ``-shm`` present.
+
+    Falling back is never silent. ``adapter_errors`` keeps the live database
+    failure, ``status_data_source`` says ``snapshot``, and the snapshot's own
+    timestamp and age travel with it, so a reader can tell "DailyMail's last
+    committed state" from "the database was successfully probed".
+    """
+    if source not in (SOURCE_AUTO, SOURCE_DB, SOURCE_SNAPSHOT):
+        raise ValueError(f"unknown status source {source!r}")
+
     observed_at = _now()
     timer = _systemd_snapshot()
     db_error: str | None = None
+    snapshot_error: str | None = None
+    staleness_notes: list[str] = []
+    snapshot_meta: dict[str, Any] = {}
+    data_source = SOURCE_DB
     stats: dict[str, int] = {}
-    rows: list[sqlite3.Row] = []
-    last_retrieval_success: sqlite3.Row | None = None
-    last_delivery_success: sqlite3.Row | None = None
+    rows: list[Any] = []
+    last_retrieval_success: Any = None
+    last_delivery_success: Any = None
     parking: dict[str, Any] = {}
+    database_size: int | None = None
     try:
+        if source == SOURCE_SNAPSHOT:
+            raise _SkipDatabase()
         connection = db.connect_readonly()
         try:
             schema = connection.execute(
@@ -376,10 +401,79 @@ def build_status() -> dict[str, Any]:
             }
         finally:
             connection.close()
-    except (FileNotFoundError, sqlite3.Error, RuntimeError) as exc:
+    except _SkipDatabase:
+        db_error = None
+    except (FileNotFoundError, sqlite3.Error, RuntimeError, OSError) as exc:
         db_error = _safe_text(exc) or "Unable to read DailyMail history."
 
+    snapshot_requested = source != SOURCE_DB and (
+        db_error is not None or source == SOURCE_SNAPSHOT
+    )
+    if snapshot_requested:
+        # The live database could not be read -- or was deliberately not tried.
+        # Fall back to what DailyMail itself published at its last committed
+        # transition. `db_error` is kept exactly as it was: the point is to
+        # report the outage *and* still say what is true, not to hide one with
+        # the other.
+        (
+            stats,
+            rows,
+            last_retrieval_success,
+            last_delivery_success,
+            parking,
+            database_size,
+            snapshot_meta,
+            snapshot_error,
+        ) = _load_from_snapshot(observed_at, timer)
+        if snapshot_error is None:
+            data_source = SOURCE_SNAPSHOT
+        else:
+            data_source = SOURCE_UNAVAILABLE
+    elif db_error is not None:
+        data_source = SOURCE_UNAVAILABLE
+
     latest = rows[0] if rows else None
+
+    # The distinction this whole change rests on. `db_error` means "the live
+    # database could not be probed" -- which was always true under the collector
+    # boundary and is why the probe is being fixed. `history_error` means "and
+    # therefore nothing is known", which is only true when the fallback did not
+    # produce usable, current history.
+    #
+    # Reporting `unknown` while holding a snapshot that says the 06:30 run
+    # delivered would be under-reporting exactly as badly as reporting healthy
+    # from a stale one would be over-reporting. So: fresh snapshot, judge the
+    # committed state; stale snapshot, say stale; no snapshot, say unknown.
+    # `db_error` means the live database could not be probed. `history_error`
+    # means nothing is known -- which is only true when the fallback did not
+    # produce usable, current history. Under `--source snapshot` there is no
+    # database error to inherit, so a failed snapshot read has to supply one:
+    # otherwise the document said "No DailyMail run has been recorded", which is
+    # precisely the confusion between "unreadable" and "never ran" that this
+    # whole change exists to remove.
+    history_error = db_error or (snapshot_error if snapshot_requested else None)
+    component_source = "DailyMail SQLite history and systemd user manager"
+    if data_source == SOURCE_SNAPSHOT:
+        component_source = (
+            "DailyMail status snapshot (published by DailyMail) and systemd "
+            "user manager"
+        )
+        stale = snapshot_meta.get("status_snapshot_stale")
+        if stale is True:
+            history_error = (
+                "DailyMail status snapshot is stale: no run has published one "
+                f"since {snapshot_meta.get('status_snapshot_expected_since')}"
+            )
+        elif stale is None:
+            # Undetermined, not fine. Fail closed.
+            history_error = snapshot_meta.get("status_snapshot_staleness_error") or (
+                "DailyMail status snapshot freshness could not be determined"
+            )
+        else:
+            history_error = None
+        if history_error and history_error not in staleness_notes:
+            staleness_notes.append(history_error)
+
     components = [
         _component(
             component_id="daily-retrieval",
@@ -388,8 +482,9 @@ def build_status() -> dict[str, Any]:
             timer=timer,
             latest=latest,
             last_success=last_retrieval_success,
-            db_error=db_error,
+            db_error=history_error,
             delivery=False,
+            source=component_source,
         ),
         _component(
             component_id="daily-digest",
@@ -398,15 +493,28 @@ def build_status() -> dict[str, Any]:
             timer=timer,
             latest=latest,
             last_success=last_delivery_success,
-            db_error=db_error,
+            db_error=history_error,
             delivery=True,
+            source=component_source,
         ),
     ]
     health, summary = _overall(components)
     metrics: dict[str, int | float | str | None] = {
         f"database_{name}": value for name, value in stats.items()
     }
-    metrics["database_size_bytes"] = _database_size()
+    # A live `stat()` first: it needs no WAL index, so it works inside the
+    # collector sandbox, and the snapshot's own figure was taken mid-transition
+    # before a checkpoint and reads far too small.
+    live_size = _database_size()
+    metrics["database_size_bytes"] = (
+        live_size
+        if live_size is not None
+        else (
+            database_size
+            if isinstance(database_size, int) and not isinstance(database_size, bool)
+            else None
+        )
+    )
     metrics.update(
         {
             "parking_cache_age_seconds": parking.get("cache_age_seconds"),
@@ -442,7 +550,214 @@ def build_status() -> dict[str, Any]:
         "metrics": metrics,
         "recent_runs": [_run_summary(row) for row in rows],
         "problems": _problems(components),
-        "adapter_errors": [db_error] if db_error else [],
+        # Both failures are reported, separately and in full. A snapshot that
+        # rescued the document does not erase the database error that made it
+        # necessary, and a snapshot that failed too does not erase either.
+        "adapter_errors": [
+            message
+            for message in (db_error, snapshot_error, *staleness_notes)
+            if message
+        ],
+        # Provenance. Never omitted, so "which of these did I get?" is always
+        # answerable without inference.
+        "status_data_source": data_source,
+        **snapshot_meta,
+    }
+
+
+def _expected_run_window_start(now: datetime) -> datetime | None:
+    """The most recent moment DailyMail was scheduled to run, in Eastern time.
+
+    Staleness is a schedule question, not an age question. A snapshot written at
+    the end of the 06:30 run is the current truth all day; the same snapshot is
+    stale the moment a 06:30 comes and goes without a newer one.
+    """
+    try:
+        from . import settings as settings_module
+
+        configured = settings_module.load()
+        zone = ZoneInfo(configured.timezone)
+        hour, _, minute = configured.daily_send_time.partition(":")
+        send_hour, send_minute = int(hour), int(minute or 0)
+    except Exception:  # noqa: BLE001 - staleness must never crash the probe
+        return None
+
+    local = now.astimezone(zone)
+    today = local.replace(
+        hour=send_hour, minute=send_minute, second=0, microsecond=0
+    )
+    return today if local >= today else today - timedelta(days=1)
+
+
+def _snapshot_staleness(generated_at: str | None, observed_at: str) -> dict[str, Any]:
+    """Age, and whether a scheduled run has since come and gone without one.
+
+    `status_snapshot_stale` is deliberately three-valued. `False` means "checked,
+    and current"; `True` means "checked, and a run should have refreshed this";
+    `None` means **the check could not be made**, which is not the same thing as
+    "fine" and must not be treated as one.
+
+    That distinction is the whole point. Deciding staleness needs the configured
+    schedule, and `settings.load()` can fail -- an unparseable `daily_send_time`,
+    a bad timezone name, a corrupt `config.toml`, or a sandbox that hides
+    `~/.config` from the reader. Treating any of those as "not stale" would let a
+    snapshot of any age report `healthy` with an empty `adapter_errors`, which is
+    exactly the over-report this design refuses to make. So an undetermined
+    answer degrades like a stale one.
+    """
+    out: dict[str, Any] = {
+        "status_snapshot_generated_at": _normalized_timestamp(generated_at),
+        "status_snapshot_age_seconds": _age_seconds(generated_at),
+        "status_snapshot_stale": None,
+    }
+    generated = _parse_persisted_timestamp(generated_at)
+    if generated is None:
+        out["status_snapshot_staleness_error"] = (
+            "status snapshot timestamp could not be parsed, so its freshness is "
+            "unknown"
+        )
+        return out
+    now = _parse_persisted_timestamp(observed_at) or datetime.now(timezone.utc)
+    window = _expected_run_window_start(now)
+    if window is None:
+        out["status_snapshot_staleness_error"] = (
+            "DailyMail's schedule could not be read, so the status snapshot's "
+            "freshness is unknown"
+        )
+        return out
+    # Stale exactly when the last scheduled run started after this snapshot was
+    # written -- i.e. a run should have produced a newer one and did not.
+    out["status_snapshot_stale"] = generated < window
+    out["status_snapshot_expected_since"] = _normalized_timestamp(window.isoformat())
+    return out
+
+
+def _load_from_snapshot(observed_at: str, timer: dict[str, Any]):
+    """Rebuild the database-derived half of the document from the snapshot.
+
+    Returns exactly the values `build_status` would have read from SQLite, so
+    every downstream helper -- `_component`, `_run_summary`, `_run_metrics`,
+    `_problems` -- runs unchanged over them. That is deliberate: it is what makes
+    the snapshot-backed and database-backed documents agree field for field
+    instead of approximately.
+    """
+    from . import status_snapshot
+
+    empty = ({}, [], None, None, {}, None, {}, None)
+    try:
+        document = status_snapshot.read()
+    except status_snapshot.SnapshotError as exc:
+        # Distinct from the database error, and never turned into zeroes: a
+        # document reporting no runs is indistinguishable from a DailyMail that
+        # has never run, which is the one thing this must not say.
+        return (*empty[:7], _safe_text(exc) or "Status snapshot is unavailable.")
+
+    # `status_snapshot.read` has already refused anything structurally wrong, so
+    # these are plain reads rather than defensive ones -- but statistics are
+    # filtered to numbers because they are published as metrics, and a string
+    # that happens to look like a count is not one.
+    # `bool` is an `int` subclass, so it has to be excluded by name: a
+    # `database_runs: true` reaching a field ControlPanel reads as a count is a
+    # type error the contract should never carry. Key names are bounded too --
+    # they become `database_<name>` metric keys in a published document.
+    stats = {
+        name[:_MAX_METRIC_NAME]: value
+        for name, value in (document.get("statistics") or {}).items()
+        if isinstance(name, str)
+        and (value is None or (isinstance(value, (int, float)) and not isinstance(value, bool)))
+    }
+    rows = document.get("recent_runs") or []
+    sources = document.get("parking_sources") or {}
+    parking = {
+        "oldest_verified_at": sources.get("oldest_verified_at"),
+        "newest_verified_at": sources.get("newest_verified_at"),
+        "cache_age_seconds": _age_seconds(sources.get("oldest_verified_at")),
+        "failed_sources": sources.get("failed_sources") or 0,
+        "latest_run": _parse_parking_stats(rows[0].get("parking_stats"))
+        if rows
+        else None,
+    }
+    meta: dict[str, Any] = {
+        "status_snapshot_schema": document.get("schema_version"),
+        "status_snapshot_path": status_snapshot.describe_path(),
+    }
+    meta.update(_snapshot_staleness(document.get("generated_at"), observed_at))
+    delivery = document.get("latest_delivery") or {}
+    if delivery:
+        # Bounded on the way out as well as on the way in: the snapshot is a
+        # file, and a file can be replaced by something that did not come from
+        # this application.
+        meta["status_latest_delivery_state"] = _safe_text(
+            delivery.get("state"), limit=64
+        )
+        meta["status_latest_delivery_at"] = _normalized_timestamp(
+            delivery.get("sent_at") or delivery.get("prepared_at")
+        )
+    confirmed = document.get("last_confirmed_delivery") or {}
+    if confirmed:
+        meta["status_last_confirmed_delivery_at"] = _normalized_timestamp(
+            confirmed.get("sent_at") or confirmed.get("prepared_at")
+        )
+    return (
+        stats,
+        rows,
+        document.get("last_retrieval_success"),
+        document.get("last_delivery_success"),
+        parking,
+        document.get("database_size_bytes"),
+        meta,
+        None,
+    )
+
+
+def unavailable_status(reason: str) -> dict[str, Any]:
+    """A minimal, valid `controlpanel.status.v1` document saying nothing is known.
+
+    The last resort behind `dailymail health --json`. It exists so that an
+    unexpected failure in the builder still produces a *document* -- the contract
+    ControlPanel depends on is that this command always answers, and "I could not
+    work it out" is an answer while a traceback is not.
+
+    Deliberately hand-built rather than routed back through `build_status`: the
+    thing that just failed is `build_status`.
+    """
+    summary = "DailyMail status could not be determined"
+    components = [
+        {
+            "id": component_id,
+            "name": name,
+            "health": "unknown",
+            "summary": summary,
+            "observed_at": _now(),
+            "source": "DailyMail status command",
+            "freshness_seconds": None,
+            "last_attempt": None,
+            "last_success": None,
+            "next_expected": None,
+            "evidence": [],
+            "actions": ["refresh"],
+        }
+        for component_id, name in (
+            ("daily-retrieval", "Rowan announcement retrieval"),
+            ("daily-digest", "Curated digest delivery"),
+        )
+    ]
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "project": "dailymail",
+        "display_name": "DailyMail",
+        "observed_at": _now(),
+        "health": "unknown",
+        "summary": summary,
+        "overall": {"health": "unknown", "summary": summary},
+        "components": components,
+        "metrics": {},
+        "recent_runs": [],
+        "problems": [
+            {"component": "daily-retrieval", "summary": summary, "detail": reason}
+        ],
+        "adapter_errors": [reason],
+        "status_data_source": SOURCE_UNAVAILABLE,
     }
 
 

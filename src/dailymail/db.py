@@ -1197,6 +1197,18 @@ def counts_for_date(connection: sqlite3.Connection, target_date: str) -> dict:
 # --- runs --------------------------------------------------------------------
 
 
+def _publish_status_snapshot(connection: sqlite3.Connection) -> None:
+    """Publish the operational status snapshot after a committed transition.
+
+    Imported lazily because `status_snapshot` reads back through this module.
+    Never raises: see `status_snapshot.write_after_commit` for why an
+    observability failure is not allowed to move business state.
+    """
+    from . import status_snapshot
+
+    status_snapshot.write_after_commit(connection)
+
+
 def start_run(
     connection: sqlite3.Connection, target_date: str, trigger: str = "manual"
 ) -> int:
@@ -1206,7 +1218,13 @@ def start_run(
             "VALUES (?, ?, 'running', ?)",
             (target_date, now_utc(), trigger),
         )
-        return int(cursor.lastrowid)
+        run_id = int(cursor.lastrowid)
+    # Outside the transaction, so the file can only ever describe a row the
+    # database has already committed. `status_snapshot.py` explains why an
+    # observer reads this instead of taking a lock on a WAL database it cannot
+    # create a `-shm` for.
+    _publish_status_snapshot(connection)
+    return run_id
 
 
 def finish_run(connection: sqlite3.Connection, run_id: int, **fields) -> None:
@@ -1233,6 +1251,7 @@ def finish_run(connection: sqlite3.Connection, run_id: int, **fields) -> None:
             f"UPDATE runs SET {assignments} WHERE run_id = ?",
             (*updates.values(), run_id),
         )
+    _publish_status_snapshot(connection)
 
 
 # --- curation ----------------------------------------------------------------
@@ -1327,7 +1346,12 @@ def record_delivery(
                 error_summary,
             ),
         )
-        return int(cursor.lastrowid)
+        delivery_id = int(cursor.lastrowid)
+    # Delivery state is the half of DailyMail's status that `runs` alone cannot
+    # answer -- sent, held, skipped as a duplicate, failed at SMTP -- so it gets
+    # its own publish, again only after the row is committed.
+    _publish_status_snapshot(connection)
+    return delivery_id
 
 
 def statistics(connection: sqlite3.Connection) -> dict:

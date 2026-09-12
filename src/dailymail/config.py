@@ -64,3 +64,19 @@ def collections_dir() -> Path:
 
 def collection_path(target_date: str) -> Path:
     return collections_dir() / f"{target_date}.json"
+
+
+# The operational status snapshot. Deliberately in the state directory and NOT
+# beside the SQLite database: ControlPanel's collector runs with
+# `ProtectHome=read-only`, which lets it read both but write neither -- and a
+# WAL database cannot be read at all without creating a `-shm` sidecar in its
+# own directory, which is exactly the failure this file exists to route around.
+def status_snapshot_path() -> Path:
+    return state_dir() / "status.json"
+
+
+# The snapshot is a bounded projection, never an archive. A reader that finds
+# more than this has found a file it should not trust.
+STATUS_SNAPSHOT_MAX_BYTES = 256 * 1024
+# Permissions: the same 0600 the rest of DailyMail's private state uses.
+STATUS_SNAPSHOT_MODE = 0o600

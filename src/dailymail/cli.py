@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sqlite3
 import sys
 
 from . import collect, config
@@ -120,6 +121,31 @@ def _build_parser() -> argparse.ArgumentParser:
     health_parser.add_argument(
         "--json", action="store_true", required=True,
         help="Emit controlpanel.status.v1 JSON.",
+    )
+    health_parser.add_argument(
+        "--source", choices=("auto", "database", "snapshot"), default="auto",
+        help=(
+            "Where the history comes from. 'auto' (the default, and what "
+            "production uses) reads the live database and falls back to the "
+            "published status snapshot when that read fails; 'database' never "
+            "falls back; 'snapshot' never opens SQLite at all."
+        ),
+    )
+
+    snapshot_parser = subparsers.add_parser(
+        "status-snapshot",
+        help="Maintain the operational status snapshot ControlPanel reads.",
+    )
+    snapshot_sub = snapshot_parser.add_subparsers(dest="snapshot_command")
+    refresh_parser = snapshot_sub.add_parser(
+        "refresh",
+        help="Rewrite the status snapshot from committed state. Local only.",
+    )
+    refresh_parser.add_argument(
+        "--json", action="store_true", help="Print the snapshot that was written."
+    )
+    snapshot_sub.add_parser(
+        "show", help="Print the current status snapshot without rewriting it."
     )
 
     subparsers.add_parser("db-status", help="Database statistics.")
@@ -836,10 +862,97 @@ def _cmd_status(args: argparse.Namespace) -> int:
 
 
 def _cmd_health(args: argparse.Namespace) -> int:
-    """Print the stable status contract without changing DailyMail state."""
+    """Print the stable status contract without changing DailyMail state.
+
+    Belt and braces around the whole builder. The contract's value to
+    ControlPanel is that it *always* answers: the original defect was a blank
+    document, and a traceback would be strictly worse -- no document at all,
+    arriving exactly when something else is already wrong. So an unexpected
+    failure anywhere below becomes a minimal, honest `unavailable` document
+    rather than a stack trace on stderr.
+    """
     from . import health
 
-    print(json.dumps(health.build_status(), sort_keys=True, separators=(",", ":")))
+    source = getattr(args, "source", "auto") or "auto"
+    try:
+        document = health.build_status(source)
+    except Exception as exc:  # noqa: BLE001 - the probe must always answer
+        from . import redact
+
+        document = health.unavailable_status(
+            redact.safe_text(f"{type(exc).__name__}: {exc}")
+            or "status could not be built"
+        )
+    print(json.dumps(document, sort_keys=True, separators=(",", ":")))
+    return 0
+
+
+def _cmd_status_snapshot(args: argparse.Namespace) -> int:
+    """Maintain the status snapshot, and nothing else.
+
+    `refresh` exists so a freshly activated release can publish a correct status
+    immediately instead of waiting for the next 06:30 run. It is deliberately
+    incapable of doing anything else: it opens the database read-only, projects
+    committed state, and writes one file. No Rowan request, no SMTP, no model,
+    no render, no delivery, no run record, and no write to the application
+    database. `run-daily` is a different command for a reason.
+    """
+    from . import config, status_snapshot
+
+    command = getattr(args, "snapshot_command", None) or "refresh"
+
+    if command == "show":
+        try:
+            document = status_snapshot.read()
+        except status_snapshot.SnapshotError as exc:
+            print(f"NO SNAPSHOT {config.status_snapshot_path()}: {exc}", file=sys.stderr)
+            return 1
+        print(json.dumps(document, sort_keys=True, indent=1))
+        return 0
+
+    from . import db
+
+    try:
+        connection = db.connect_readonly()
+    except (FileNotFoundError, sqlite3.Error) as exc:
+        print(f"SNAPSHOT FAILED: cannot read the database: {exc}", file=sys.stderr)
+        return 1
+    try:
+        path = status_snapshot.write(connection)
+    except (OSError, sqlite3.Error, ValueError, TypeError) as exc:
+        print(f"SNAPSHOT FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        connection.close()
+
+    try:
+        document = status_snapshot.read(path)
+    except status_snapshot.SnapshotError as exc:
+        # Writing it worked and reading it back did not, which means what is on
+        # disk cannot be trusted. Say so rather than raising.
+        print(f"SNAPSHOT FAILED: wrote {path} but could not read it back: {exc}",
+              file=sys.stderr)
+        return 1
+    if getattr(args, "json", False):
+        print(json.dumps(document, sort_keys=True, indent=1))
+        return 0
+    runs = document.get("recent_runs") or []
+    latest = runs[0] if runs else None
+    print(f"SNAPSHOT OK {path} ({path.stat().st_size} bytes, mode "
+          f"{oct(path.stat().st_mode & 0o777)})")
+    print(f"  generated_at: {document.get('generated_at')}")
+    print(f"  schema      : {document.get('schema_version')}")
+    if latest:
+        print(
+            f"  latest run  : #{latest.get('run_id')} {latest.get('target_date')} "
+            f"{latest.get('status')} email={latest.get('email_status')}"
+        )
+    delivery = document.get("latest_delivery") or {}
+    if delivery:
+        print(
+            f"  latest deliv: {delivery.get('state')} "
+            f"{delivery.get('sent_at') or delivery.get('prepared_at')}"
+        )
     return 0
 
 
@@ -1613,6 +1726,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_status(args)
         if args.command == "health":
             return _cmd_health(args)
+        if args.command == "status-snapshot":
+            return _cmd_status_snapshot(args)
         if args.command == "db-status":
             return _cmd_db_status(args)
         if args.command == "db-init":

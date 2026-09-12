@@ -49,6 +49,7 @@ is two HTTP requests and under two seconds.
 | Parking source unreachable, resolver failure, or an unresolvable lot | Recorded in `runs.parking_stats`; the announcement shows the official campus parking map instead. **No alert**, and the digest is unaffected |
 | Event parse failure, invalid model relevance output, unresolvable venue, route lookup failure, or calendar-link generation failure | Recorded in `runs.calendar_stats` and `calendar_recommendations`. At worst one announcement loses its calendar button; a routing failure only makes the travel estimate rougher. **No alert**, and the digest is unaffected |
 | Logical-repeat detection fails | The day is left exactly as Rowan classified it. **No alert** |
+| Status-snapshot write fails | Logged and swallowed. Committed state, the digest, delivery idempotency and the run are all unaffected; the next `health` reports the snapshot as missing or stale. **No alert** |
 
 ---
 
@@ -66,6 +67,13 @@ uv run dailymail run-daily --force-resend        # deliberate duplicate send
 # inspection
 uv run dailymail status                          # runs, deliveries, timer
 uv run dailymail health --json                   # read-only controlpanel.status.v1 JSON
+uv run dailymail health --json --source database # database only, never falls back
+uv run dailymail health --json --source snapshot # snapshot only, never opens SQLite
+uv run dailymail status-snapshot refresh         # republish the snapshot now
+# ^ run this from the *immutable release* immediately after every activation:
+#   /mnt/bench/releases/dailymail/current/.venv/bin/dailymail status-snapshot refresh
+#   Otherwise ControlPanel reports `unavailable` until the next 06:30 run.
+uv run dailymail status-snapshot show            # print it without rewriting
 uv run dailymail status --json                   # compatibility alias for the same JSON
 uv run dailymail db-status                       # schema, counts, categories, backups
 uv run dailymail render --date 2026-08-20 --inline-images --out /tmp/preview

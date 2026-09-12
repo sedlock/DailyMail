@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import config, normalize, validate
+from .atomic import atomic_write_json
 from .client import AnnouncerClient, build_http_client
 from .discovery import RuntimeVersions, discover
 from .errors import UsageError, ValidationError, VersionChangedError
@@ -293,16 +292,16 @@ def run_collection(
 
 
 def write_artifact(artifact: dict) -> Path:
-    """Atomically write the single normalized artifact. No raw copy is kept."""
-    path = config.collection_path(artifact["target_date"])
-    path.parent.mkdir(parents=True, exist_ok=True)
-    handle, temp_name = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            json.dump(artifact, stream, ensure_ascii=False, indent=1)
-            stream.write("\n")
-        os.replace(temp_name, path)
-    except BaseException:
-        Path(temp_name).unlink(missing_ok=True)
-        raise
-    return path
+    """Atomically write the single normalized artifact. No raw copy is kept.
+
+    The mechanism moved to `atomic.atomic_write_json` unchanged, so the status
+    snapshot and the collection artifact share one proven implementation rather
+    than two that drift.
+    """
+    return atomic_write_json(
+        config.collection_path(artifact["target_date"]),
+        artifact,
+        # Preserved from the original: keys stay in the order the artifact was
+        # assembled, which is what makes a day-to-day diff readable.
+        sort_keys=False,
+    )
